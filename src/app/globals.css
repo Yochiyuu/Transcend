@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+
+  --color-background: #121212;
+  --color-card: #1E1E1E;
+  --color-input: #2A2A2A;
+  --color-primary: #FF3B47;
+  --color-primary-hover: #E63540;
+  --color-border: #333333;
+
+  --background-image-red-glow-bottom: radial-gradient(circle at 50% 100%, rgba(255, 59, 71, 0.2) 0%, rgba(18, 18, 18, 0) 50%);
+}
+
+body {
+  background-color: var(--color-background);
+  color: white;
+  font-family: var(--font-sans);
+}
