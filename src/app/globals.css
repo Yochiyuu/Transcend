@@ -2,19 +2,52 @@
 
 @theme {
   --font-sans: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
-
-  --color-background: #121212;
-  --color-card: #1E1E1E;
-  --color-input: #2A2A2A;
+  --color-background: #000000;
   --color-primary: #FF3B47;
-  --color-primary-hover: #E63540;
-  --color-border: #333333;
-
-  --background-image-red-glow-bottom: radial-gradient(circle at 50% 100%, rgba(255, 59, 71, 0.2) 0%, rgba(18, 18, 18, 0) 50%);
 }
 
 body {
   background-color: var(--color-background);
   color: white;
   font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+/* AURORA BACKGROUND EFFECT */
+.aurora-bg {
+  background-color: #000000;
+  background-image:
+    repeating-linear-gradient(100deg, #60a5fa 0%, #e879f9 50%, #5eead4 100%),
+    repeating-linear-gradient(100deg, #60a5fa 0%, #e879f9 50%, #5eead4 100%);
+  background-size: 200% 200%;
+  background-position: 0 0;
+  background-blend-mode: overlay;
+  filter: blur(100px);
+  opacity: 0.3;
+  /* Mengatur intensitas warna aurora */
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 150%;
+  height: 150%;
+  z-index: -1;
+  animation: aurora 40s linear infinite alternate;
+}
+
+@keyframes aurora {
+  0% {
+    background-position: 0% 50%;
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+
+  50% {
+    background-position: 100% 50%;
+    transform: translate(-50%, -50%) rotate(10deg);
+  }
+
+  100% {
+    background-position: 0% 50%;
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
 }
