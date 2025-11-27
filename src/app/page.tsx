@@ -110,7 +110,7 @@ export default function LandingPage() {
             <div className="grid grid-cols-3 max-w-4xl mx-auto text-center divide-x divide-white/10">
               <div>
                 <h3 className="text-3xl lg:text-5xl font-bold text-primary mb-1 drop-shadow-[0_0_10px_rgba(255,59,71,0.4)]">
-                  2.5k+
+                  2.5K+
                 </h3>
                 <p className="text-gray-500 uppercase tracking-widest text-xs font-bold">
                   Partner
@@ -118,7 +118,7 @@ export default function LandingPage() {
               </div>
               <div>
                 <h3 className="text-3xl lg:text-5xl font-bold text-primary mb-1 drop-shadow-[0_0_10px_rgba(255,59,71,0.4)]">
-                  500k+
+                  500K+
                 </h3>
                 <p className="text-gray-500 uppercase tracking-widest text-xs font-bold">
                   Active User
@@ -126,7 +126,7 @@ export default function LandingPage() {
               </div>
               <div>
                 <h3 className="text-3xl lg:text-5xl font-bold text-primary mb-1 drop-shadow-[0_0_10px_rgba(255,59,71,0.4)]">
-                  2m+
+                  2M+
                 </h3>
                 <p className="text-gray-500 uppercase tracking-widest text-xs font-bold">
                   User Happy
