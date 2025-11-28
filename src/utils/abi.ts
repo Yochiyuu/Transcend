@@ -1,26 +1,20 @@
 // src/utils/abi.ts
 
-export const CONTRACT_ADDRESS = "0xA779338DB74Ab3E3329bb572b5d1521d310D7de5";
+// Alamat Smart Contract (dari link Blockscout Lisk Sepolia yang Anda berikan)
+export const CONTRACT_ADDRESS = "0x57472feF0B62745862F81E8020e17e94bCcA335b";
 
+// Alamat Mock USDT (Jangan diubah jika masih menggunakan token yang sama)
 export const USDT_ADDRESS = "0x69a58006574BBf7032afb321341661Db8754d21b";
 
+// ABI untuk TransendFreeMultiToken (Sesuai dengan kode Solidity sebelumnya)
 export const MULTI_SENDER_ABI = [
-  { inputs: [], stateMutability: "nonpayable", type: "constructor" },
-  {
-    inputs: [{ internalType: "address", name: "owner", type: "address" }],
-    name: "OwnableInvalidOwner",
-    type: "error",
-  },
-  {
-    inputs: [{ internalType: "address", name: "account", type: "address" }],
-    name: "OwnableUnauthorizedAccount",
-    type: "error",
-  },
+  // Error jika transfer token gagal (dari library SafeERC20)
   {
     inputs: [{ internalType: "address", name: "token", type: "address" }],
     name: "SafeERC20FailedOperation",
     type: "error",
   },
+  // Event yang dipancarkan setelah pembayaran sukses
   {
     anonymous: false,
     inputs: [
@@ -45,13 +39,14 @@ export const MULTI_SENDER_ABI = [
       {
         indexed: false,
         internalType: "uint256",
-        name: "totalERC20Transfers",
+        name: "totalERC20Sent",
         type: "uint256",
       },
     ],
     name: "MultiPaymentExecuted",
     type: "event",
   },
+  // Fungsi Utama: multiPay
   {
     inputs: [
       { internalType: "address[]", name: "recipients", type: "address[]" },
@@ -63,15 +58,9 @@ export const MULTI_SENDER_ABI = [
     stateMutability: "payable",
     type: "function",
   },
-  {
-    inputs: [],
-    name: "owner",
-    outputs: [{ internalType: "address", name: "", type: "address" }],
-    stateMutability: "view",
-    type: "function",
-  },
 ] as const;
 
+// ABI Standar untuk Token ERC20 (USDT, dll)
 export const ERC20_ABI = [
   {
     inputs: [{ internalType: "address", name: "account", type: "address" }],
