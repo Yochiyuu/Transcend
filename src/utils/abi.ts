@@ -1,20 +1,32 @@
 // src/utils/abi.ts
 
-// Alamat Smart Contract (dari link Blockscout Lisk Sepolia yang Anda berikan)
+// =================================================================
+// 1. ADDRESSES
+// =================================================================
+
+// Contract Lama (Community/Free)
 export const CONTRACT_ADDRESS = "0x57472feF0B62745862F81E8020e17e94bCcA335b";
 
-// Alamat Mock USDT (Jangan diubah jika masih menggunakan token yang sama)
+// Contract Baru (Enterprise)
+export const ENTERPRISE_ADDRESS = "0x0695d1eE70a27541809ad6B06E42Ec84586026fa";
+
+// Token Mock USDT
 export const USDT_ADDRESS = "0x69a58006574BBf7032afb321341661Db8754d21b";
 
-// ABI untuk TransendFreeMultiToken (Sesuai dengan kode Solidity sebelumnya)
+// Token Mock DAI (BARU - Tolong isi addressnya nanti)
+export const DAI_ADDRESS = "0x72D7E7e9f7A4361fa3462B81AadeecA7f121CeED";
+
+// =================================================================
+// 2. ABIs
+// =================================================================
+
+// --- ABI COMMUNITY (MULTI SENDER) ---
 export const MULTI_SENDER_ABI = [
-  // Error jika transfer token gagal (dari library SafeERC20)
   {
     inputs: [{ internalType: "address", name: "token", type: "address" }],
     name: "SafeERC20FailedOperation",
     type: "error",
   },
-  // Event yang dipancarkan setelah pembayaran sukses
   {
     anonymous: false,
     inputs: [
@@ -46,7 +58,6 @@ export const MULTI_SENDER_ABI = [
     name: "MultiPaymentExecuted",
     type: "event",
   },
-  // Fungsi Utama: multiPay
   {
     inputs: [
       { internalType: "address[]", name: "recipients", type: "address[]" },
@@ -60,11 +71,98 @@ export const MULTI_SENDER_ABI = [
   },
 ] as const;
 
-// ABI Standar untuk Token ERC20 (USDT, dll)
+// --- ABI ERC20 (STANDARD & MOCK DAI) ---
+// ABI ini bisa dipakai untuk USDT maupun DAI karena sama-sama ERC20
 export const ERC20_ABI = [
   {
-    inputs: [{ internalType: "address", name: "account", type: "address" }],
-    name: "balanceOf",
+    inputs: [],
+    stateMutability: "nonpayable",
+    type: "constructor",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "spender", type: "address" },
+      { internalType: "uint256", name: "allowance", type: "uint256" },
+      { internalType: "uint256", name: "needed", type: "uint256" },
+    ],
+    name: "ERC20InsufficientAllowance",
+    type: "error",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "sender", type: "address" },
+      { internalType: "uint256", name: "balance", type: "uint256" },
+      { internalType: "uint256", name: "needed", type: "uint256" },
+    ],
+    name: "ERC20InsufficientBalance",
+    type: "error",
+  },
+  {
+    inputs: [{ internalType: "address", name: "approver", type: "address" }],
+    name: "ERC20InvalidApprover",
+    type: "error",
+  },
+  {
+    inputs: [{ internalType: "address", name: "receiver", type: "address" }],
+    name: "ERC20InvalidReceiver",
+    type: "error",
+  },
+  {
+    inputs: [{ internalType: "address", name: "sender", type: "address" }],
+    name: "ERC20InvalidSender",
+    type: "error",
+  },
+  {
+    inputs: [{ internalType: "address", name: "spender", type: "address" }],
+    name: "ERC20InvalidSpender",
+    type: "error",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "owner",
+        type: "address",
+      },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "spender",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "value",
+        type: "uint256",
+      },
+    ],
+    name: "Approval",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: "address", name: "from", type: "address" },
+      { indexed: true, internalType: "address", name: "to", type: "address" },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "value",
+        type: "uint256",
+      },
+    ],
+    name: "Transfer",
+    type: "event",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "owner", type: "address" },
+      { internalType: "address", name: "spender", type: "address" },
+    ],
+    name: "allowance",
     outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",
@@ -80,11 +178,8 @@ export const ERC20_ABI = [
     type: "function",
   },
   {
-    inputs: [
-      { internalType: "address", name: "owner", type: "address" },
-      { internalType: "address", name: "spender", type: "address" },
-    ],
-    name: "allowance",
+    inputs: [{ internalType: "address", name: "account", type: "address" }],
+    name: "balanceOf",
     outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",
@@ -98,8 +193,92 @@ export const ERC20_ABI = [
   },
   {
     inputs: [],
+    name: "name",
+    outputs: [{ internalType: "string", name: "", type: "string" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
     name: "symbol",
     outputs: [{ internalType: "string", name: "", type: "string" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "totalSupply",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "to", type: "address" },
+      { internalType: "uint256", name: "value", type: "uint256" },
+    ],
+    name: "transfer",
+    outputs: [{ internalType: "bool", name: "", type: "bool" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "from", type: "address" },
+      { internalType: "address", name: "to", type: "address" },
+      { internalType: "uint256", name: "value", type: "uint256" },
+    ],
+    name: "transferFrom",
+    outputs: [{ internalType: "bool", name: "", type: "bool" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+] as const;
+
+// --- ABI ENTERPRISE (COMPANY POOL) ---
+export const ENTERPRISE_ABI = [
+  {
+    inputs: [],
+    name: "registerCompany",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address", name: "", type: "address" }],
+    name: "companyPools",
+    outputs: [{ internalType: "bool", name: "exists", type: "bool" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "token", type: "address" },
+      { internalType: "uint256", name: "amount", type: "uint256" },
+    ],
+    name: "deposit",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "token", type: "address" },
+      { internalType: "address[]", name: "recipients", type: "address[]" },
+      { internalType: "uint256[]", name: "amounts", type: "uint256[]" },
+    ],
+    name: "executePayroll",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "company", type: "address" },
+      { internalType: "address", name: "token", type: "address" },
+    ],
+    name: "getYield",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",
   },

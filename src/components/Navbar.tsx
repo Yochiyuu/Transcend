@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
+  FaBuilding,
   FaChartPie,
   FaCheck,
   FaClockRotateLeft,
@@ -58,6 +59,7 @@ export default function Navbar() {
   // Menu Items
   const navItems = [
     { name: "Dashboard", href: "/dashboard", icon: <FaChartPie /> },
+    { name: "Enterprise", href: "/enterprise", icon: <FaBuilding /> },
     {
       name: "History",
       href: "/dashboard/history",
@@ -83,7 +85,7 @@ export default function Navbar() {
                 className="w-9 h-9 object-contain relative z-10"
               />
             </div>
-            <span className="text-xl font-bold tracking-tight text-white group-hover:text-red-500 transition-colors">
+            <span className="text-xl font-bold italic tracking-tight text-white group-hover:text-red-500 transition-colors">
               Transcend
             </span>
           </Link>

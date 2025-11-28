@@ -1,12 +1,17 @@
+// src/components/landing/HeroSection.tsx
 import Link from "next/link";
 import { FaArrowRight, FaRocket } from "react-icons/fa6";
 
 export default function HeroSection() {
   return (
-    <section className="flex flex-col items-center justify-center text-center px-4 pt-40 pb-20 sm:px-6 lg:px-8 max-w-5xl mx-auto w-full">
+    // PERBAIKAN:
+    // 1. min-h-screen: Agar tinggi section minimal setinggi layar device.
+    // 2. flex & justify-center: Agar konten berada persis di tengah layar.
+    // 3. pt-20: Padding atas disesuaikan agar pas di tengah (tidak terlalu turun karena pt-40 sebelumnya).
+    <section className="flex flex-col items-center justify-center text-center px-4 pt-20 pb-10 sm:px-6 lg:px-8 max-w-5xl mx-auto w-full min-h-screen">
       <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/5 backdrop-blur-sm text-xs sm:text-sm font-medium text-gray-300 mb-6 sm:mb-8 animate-[fadeIn_1s_ease-out]">
         <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-500 animate-pulse"></span>
-        <span>The Next Gen Payment Gateway</span>
+        <span>The Next Gen Transaction Gateway</span>
       </div>
 
       <h1 className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-extrabold tracking-tight mb-6 leading-[1.1] drop-shadow-2xl">
@@ -17,8 +22,7 @@ export default function HeroSection() {
       </h1>
 
       <p className="text-base sm:text-lg md:text-xl text-white max-w-xl md:max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed px-2 font-medium opacity-90">
-        Experience the fastest way to distribute assets. Secure, transparent,
-        and built for the future of Web3 finance.
+        Experience the fastest and efficient way to distribute assets
       </p>
 
       <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto px-4 sm:px-0">

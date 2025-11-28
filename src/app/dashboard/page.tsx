@@ -2,25 +2,29 @@
 "use client";
 
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/landing/Footer";
 import {
   CONTRACT_ADDRESS,
+  DAI_ADDRESS,
   ERC20_ABI,
   MULTI_SENDER_ABI,
   USDT_ADDRESS,
 } from "@/utils/abi";
 import { config } from "@/utils/config";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import Link from "next/link"; // Wajib import Link
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
   FaArrowUpRightFromSquare,
-  FaChevronDown,
+  FaCaretDown,
   FaCircleCheck,
   FaCircleExclamation,
   FaCircleInfo,
-  FaFileCsv, // Pakai FaCircleInfo
+  FaFileCsv,
   FaPlus,
+  FaRocket,
   FaTrash,
+  FaUsers,
 } from "react-icons/fa6";
 import { isAddress, maxUint256, parseEther } from "viem";
 import {
@@ -38,11 +42,38 @@ export default function App() {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <main className="min-h-screen text-white font-sans flex flex-col bg-[#080808]">
+        <main className="flex flex-col min-h-screen bg-[#050505] text-white font-sans relative overflow-x-hidden">
           <Navbar />
-          <div className="fixed bottom-0 left-0 right-0 h-[40vh] bg-linear-to-t from-red-900/20 to-transparent pointer-events-none z-0" />
-          <div className="flex-1 flex items-center justify-center p-4 sm:p-8 pt-28 relative z-10">
-            <DashboardForm />
+
+          <div className="fixed top-[-20%] left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-red-600/20 rounded-full blur-[120px] pointer-events-none z-0" />
+          {/* Fixed: bg-gradient-to-t -> bg-linear-to-t */}
+          <div className="fixed bottom-0 left-0 right-0 h-[300px] bg-linear-to-t from-red-900/5 to-transparent pointer-events-none z-0" />
+
+          {/* Fixed: flex-grow -> grow */}
+          <div className="grow flex flex-col items-center justify-center w-full px-4 sm:px-6 pt-32 pb-20 relative z-10">
+            <div className="w-full max-w-3xl">
+              <div className="text-center mb-10 animate-fade-in-up">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-red-500/30 bg-red-500/10 text-red-400 text-xs font-bold uppercase tracking-widest mb-4">
+                  <FaUsers /> Public Protocol
+                </div>
+                <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-4 tracking-tight drop-shadow-lg">
+                  Transcend {/* Fixed: bg-gradient-to-r -> bg-linear-to-r */}
+                  <span className="text-transparent bg-clip-text bg-linear-to-r from-red-500 to-orange-500">
+                    Community
+                  </span>
+                </h1>
+                <p className="text-gray-400 text-base md:text-lg max-w-md mx-auto leading-relaxed">
+                  Distribute Mixed Assets (LSK, USDT, DAI) in a single
+                  transaction.
+                </p>
+              </div>
+
+              <DashboardForm />
+            </div>
+          </div>
+
+          <div className="relative z-10 mt-auto border-t border-white/5 bg-[#050505]">
+            <Footer />
           </div>
         </main>
       </QueryClientProvider>
@@ -53,48 +84,85 @@ export default function App() {
 interface RowData {
   address: string;
   amount: string;
-  tokenAddress: string;
-  symbol: string;
+  tokenType: "NATIVE" | "USDT" | "DAI";
 }
 
 function DashboardForm() {
   const { address, isConnected } = useAccount();
-  const { data: hash, writeContract, isPending, error: writeError } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
+  const {
+    data: hash,
+    writeContract,
+    isPending,
+    error: writeError,
+  } = useWriteContract();
+
+  // FIX: Destructure 'data' as 'receipt' to access the actual on-chain status
+  const {
+    data: receipt,
+    isLoading: isConfirming,
+    isSuccess: isTxMined,
+  } = useWaitForTransactionReceipt({ hash });
+
+  // FIX: Check receipt.status instead of the hook's status
+  const isConfirmed = isTxMined && receipt?.status === "success";
+  const isReverted = isTxMined && receipt?.status === "reverted";
 
   const [mode, setMode] = useState<"MANUAL" | "CSV">("MANUAL");
-  const [manualTokenType, setManualTokenType] = useState<"NATIVE" | "USDT">("NATIVE");
-  const [rows, setRows] = useState<RowData[]>([{ address: "", amount: "", tokenAddress: ZERO_ADDRESS, symbol: "LSK" }]);
+  const [rows, setRows] = useState<RowData[]>([
+    { address: "", amount: "", tokenType: "NATIVE" },
+  ]);
   const [totalUsdtNeeded, setTotalUsdtNeeded] = useState<bigint>(BigInt(0));
+  const [totalDaiNeeded, setTotalDaiNeeded] = useState<bigint>(BigInt(0));
   const [csvPreview, setCsvPreview] = useState("");
   const [mounted, setMounted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  const { data: allowance, refetch: refetchAllowance } = useReadContract({
+  const { data: allowanceUSDT, refetch: refetchAllowanceUSDT } =
+    useReadContract({
+      abi: ERC20_ABI,
+      address: USDT_ADDRESS,
+      functionName: "allowance",
+      args: address ? [address, CONTRACT_ADDRESS] : undefined,
+      query: { enabled: totalUsdtNeeded > 0 },
+    });
+
+  const { data: allowanceDAI, refetch: refetchAllowanceDAI } = useReadContract({
     abi: ERC20_ABI,
-    address: USDT_ADDRESS,
+    address: DAI_ADDRESS,
     functionName: "allowance",
     args: address ? [address, CONTRACT_ADDRESS] : undefined,
-    query: { enabled: totalUsdtNeeded > 0 },
+    query: { enabled: totalDaiNeeded > 0 },
   });
 
-  useEffect(() => { if (isConfirmed) refetchAllowance(); }, [isConfirmed, refetchAllowance]);
+  useEffect(() => {
+    if (isConfirmed) {
+      refetchAllowanceUSDT();
+      refetchAllowanceDAI();
+    }
+  }, [isConfirmed, refetchAllowanceUSDT, refetchAllowanceDAI]);
 
   useEffect(() => {
     let usdtTotal = BigInt(0);
+    let daiTotal = BigInt(0);
     rows.forEach((row) => {
-      if (row.tokenAddress === USDT_ADDRESS && row.amount && parseFloat(row.amount) > 0) {
-        try { usdtTotal += parseEther(row.amount); } catch {}
+      if (row.amount && parseFloat(row.amount) > 0) {
+        try {
+          const val = parseEther(row.amount);
+          if (row.tokenType === "USDT") usdtTotal += val;
+          if (row.tokenType === "DAI") daiTotal += val;
+        } catch {}
       }
     });
     setTotalUsdtNeeded(usdtTotal);
+    setTotalDaiNeeded(daiTotal);
   }, [rows]);
 
   const addRow = () => {
-    const isNative = manualTokenType === "NATIVE";
-    setRows([...rows, { address: "", amount: "", tokenAddress: isNative ? ZERO_ADDRESS : USDT_ADDRESS, symbol: isNative ? "LSK" : "USDT" }]);
+    setRows([...rows, { address: "", amount: "", tokenType: "NATIVE" }]);
   };
 
   const removeRow = (index: number) => {
@@ -103,19 +171,23 @@ function DashboardForm() {
     setRows(newRows);
   };
 
-  const handleInputChange = (index: number, field: "address" | "amount", value: string) => {
+  const handleInputChange = (
+    index: number,
+    field: "address" | "amount",
+    value: string
+  ) => {
     const newRows = [...rows];
+    // @ts-ignore
     newRows[index][field] = value;
     setRows(newRows);
   };
 
-  const handleManualTypeChange = (type: "NATIVE" | "USDT") => {
-    setManualTokenType(type);
-    const newRows = rows.map(r => ({
-      ...r,
-      tokenAddress: type === "NATIVE" ? ZERO_ADDRESS : USDT_ADDRESS,
-      symbol: type === "NATIVE" ? "LSK" : "USDT"
-    }));
+  const handleTokenTypeChange = (
+    index: number,
+    type: "NATIVE" | "USDT" | "DAI"
+  ) => {
+    const newRows = [...rows];
+    newRows[index].tokenType = type;
     setRows(newRows);
   };
 
@@ -136,11 +208,11 @@ function DashboardForm() {
           const addr = parts[0];
           const amt = parts[1];
           const symRaw = parts[2]?.toUpperCase() || "LSK";
-          let tAddr = ZERO_ADDRESS;
-          let tSym = "LSK";
-          if (symRaw === "USDT") { tAddr = USDT_ADDRESS; tSym = "USDT"; }
+          let tType: "NATIVE" | "USDT" | "DAI" = "NATIVE";
+          if (symRaw === "USDT") tType = "USDT";
+          if (symRaw === "DAI") tType = "DAI";
           if (isAddress(addr) && !isNaN(parseFloat(amt))) {
-            newRows.push({ address: addr, amount: amt, tokenAddress: tAddr, symbol: tSym });
+            newRows.push({ address: addr, amount: amt, tokenType: tType });
           }
         }
       });
@@ -151,8 +223,13 @@ function DashboardForm() {
     reader.readAsText(file);
   };
 
-  const handleApprove = () => {
-    writeContract({ address: USDT_ADDRESS, abi: ERC20_ABI, functionName: "approve", args: [CONTRACT_ADDRESS, maxUint256] });
+  const handleApprove = (tokenAddress: `0x${string}`) => {
+    writeContract({
+      address: tokenAddress,
+      abi: ERC20_ABI,
+      functionName: "approve",
+      args: [CONTRACT_ADDRESS, maxUint256],
+    });
   };
 
   const handleMultiPay = async () => {
@@ -161,126 +238,302 @@ function DashboardForm() {
       const tokens: `0x${string}`[] = [];
       const amounts: bigint[] = [];
       let totalValueNative = BigInt(0);
+
       for (const row of rows) {
-        if (!isAddress(row.address)) { alert(`Invalid address`); return; }
-        if (!row.amount || parseFloat(row.amount) <= 0) { alert(`Invalid amount`); return; }
+        if (!isAddress(row.address)) {
+          alert(`Invalid address: ${row.address}`);
+          return;
+        }
+        if (!row.amount || parseFloat(row.amount) <= 0) {
+          alert(`Invalid amount for ${row.address}`);
+          return;
+        }
+
         recipients.push(row.address as `0x${string}`);
-        tokens.push(row.tokenAddress as `0x${string}`);
+
         const amountWei = parseEther(row.amount);
         amounts.push(amountWei);
-        if (row.tokenAddress === ZERO_ADDRESS) totalValueNative += amountWei;
+
+        if (row.tokenType === "NATIVE") {
+          tokens.push(ZERO_ADDRESS);
+          totalValueNative += amountWei;
+        } else if (row.tokenType === "USDT") {
+          tokens.push(USDT_ADDRESS);
+        } else if (row.tokenType === "DAI") {
+          tokens.push(DAI_ADDRESS);
+        }
       }
-      writeContract({ address: CONTRACT_ADDRESS, abi: MULTI_SENDER_ABI, functionName: "multiPay", args: [recipients, tokens, amounts], value: totalValueNative });
-    } catch (err) { console.error(err); }
+
+      writeContract({
+        address: CONTRACT_ADDRESS,
+        abi: MULTI_SENDER_ABI,
+        functionName: "multiPay",
+        args: [recipients, tokens, amounts],
+        value: totalValueNative,
+      });
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const needsApproval = allowance !== undefined && allowance < totalUsdtNeeded;
+  const needsApproveUSDT =
+    allowanceUSDT !== undefined && allowanceUSDT < totalUsdtNeeded;
+  const needsApproveDAI =
+    allowanceDAI !== undefined && allowanceDAI < totalDaiNeeded;
   const canSubmit = !isPending && !isConfirming;
 
   if (!mounted) return null;
 
   return (
-    <div className="w-full max-w-2xl">
-      <div className="bg-[#0f0f0f] border border-red-900/50 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+    <div className="bg-[#0f0f0f]/80 backdrop-blur-xl border border-white/10 rounded-3xl p-6 sm:p-10 shadow-2xl relative overflow-hidden group">
+      <div className="absolute inset-0 border border-red-500/20 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+
+      <div className="mb-8 flex justify-center sm:justify-start">
+        <div className="flex gap-1 bg-[#151515] p-1.5 rounded-xl border border-white/5 shadow-inner">
+          <button
+            onClick={() => setMode("MANUAL")}
+            className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all duration-300 ${
+              mode === "MANUAL"
+                ? "bg-red-600 text-white shadow-lg"
+                : "text-gray-400 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            Manual Input
+          </button>
+          <button
+            onClick={() => setMode("CSV")}
+            className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all duration-300 ${
+              mode === "CSV"
+                ? "bg-red-600 text-white shadow-lg"
+                : "text-gray-400 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            Upload CSV
+          </button>
+        </div>
+      </div>
+
+      <div className="mb-8 min-h-[250px]">
         {mode === "MANUAL" && (
-          <div className="mb-8">
-            <label className="text-white font-semibold text-lg mb-2 block">Token Type (Manual Mode)</label>
-            <div className="relative">
-              <select value={manualTokenType} onChange={(e) => handleManualTypeChange(e.target.value as "NATIVE" | "USDT")} className="w-full appearance-none bg-black/40 border border-red-900/30 text-white rounded-xl px-4 py-3.5 focus:outline-none focus:border-red-500 transition-colors cursor-pointer">
-                <option value="NATIVE">Lisk (Native)</option>
-                <option value="USDT">Mock USDT (ERC20)</option>
-              </select>
-              <FaChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <div className="space-y-4 animate-fade-in">
+            <div className="flex px-4 text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+              <div className="grow">Recipient Address</div>
+              <div className="w-32 text-right mr-4">Amount</div>
+              <div className="w-24">Token</div>
             </div>
-          </div>
-        )}
 
-        <div className="mb-6">
-          <div onClick={() => setMode("MANUAL")} className="flex items-center gap-3 cursor-pointer group mb-4">
-            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${mode === "MANUAL" ? "border-red-500" : "border-gray-600 group-hover:border-red-400"}`}>
-              {mode === "MANUAL" && <div className="w-2.5 h-2.5 rounded-full bg-red-500" />}
-            </div>
-            <span className={`text-lg font-medium ${mode === "MANUAL" ? "text-white" : "text-gray-500 group-hover:text-gray-300"}`}>Manual Input</span>
-          </div>
-          {mode === "MANUAL" && (
-            <div className="space-y-3 pl-2 animate-fade-in">
-              <div className="max-h-[300px] overflow-y-auto pr-2 custom-scrollbar space-y-3">
-                {rows.map((row, index) => (
-                  <div key={index} className="flex flex-col sm:flex-row gap-3">
-                    <div className="grow-[2]">
-                      <input type="text" placeholder="0x... Address" value={row.address} onChange={(e) => handleInputChange(index, "address", e.target.value)} className="w-full bg-black/40 border border-red-900/30 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-600 focus:border-red-500 focus:outline-none transition-colors" />
-                    </div>
-                    <div className="flex-1 flex gap-2">
-                      <div className="relative w-full">
-                        <input type="number" placeholder="Amount" value={row.amount} onChange={(e) => handleInputChange(index, "amount", e.target.value)} className="w-full bg-black/40 border border-red-900/30 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-600 focus:border-red-500 focus:outline-none transition-colors" />
-                      </div>
-                      <div className="bg-black/40 border border-red-900/30 rounded-lg px-3 py-3 flex items-center justify-center min-w-[60px] text-gray-400 text-sm font-bold">{row.symbol}</div>
-                      {rows.length > 1 && <button onClick={() => removeRow(index)} className="text-gray-600 hover:text-red-500 px-1 transition-colors"><FaTrash /></button>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="flex justify-end pt-2">
-                <button onClick={addRow} className="flex items-center gap-2 px-4 py-2 bg-black/40 border border-red-900/50 hover:border-red-500 rounded-lg text-white text-sm transition-all"><FaPlus className="text-red-500" /> Add Recipient</button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="mb-8">
-          <div onClick={() => setMode("CSV")} className="flex items-center gap-3 cursor-pointer group mb-4">
-            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${mode === "CSV" ? "border-red-500" : "border-gray-600 group-hover:border-red-400"}`}>
-              {mode === "CSV" && <div className="w-2.5 h-2.5 rounded-full bg-red-500" />}
-            </div>
-            <span className={`text-lg font-medium ${mode === "CSV" ? "text-white" : "text-gray-500 group-hover:text-gray-300"}`}>Upload CSV</span>
-          </div>
-
-          {mode === "CSV" && (
-            <div className="pl-2 animate-fade-in">
-              <div className="relative">
-                <textarea readOnly value={csvPreview} placeholder="0x71C..., 0.15, ETH&#10;0x32B..., 50, USDT" className="w-full h-32 bg-black/40 border border-red-900/30 rounded-xl p-4 text-sm text-gray-300 placeholder-gray-600 focus:border-red-500 focus:outline-none resize-none font-mono leading-relaxed" />
-              </div>
-
-              <div className="mt-4 flex flex-col sm:flex-row items-center gap-4">
-                <input type="file" accept=".csv" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
-                <button onClick={() => fileInputRef.current?.click()} className="flex-1 w-full sm:w-auto flex items-center justify-center gap-2 bg-[#d1d1d1] hover:bg-white text-black font-bold py-2.5 px-6 rounded-lg transition-colors">
-                  <FaFileCsv /> Upload CSV
-                </button>
-
-                {/* --- LINK PANDUAN --- */}
-                <Link 
-                  href="/dashboard/csv-guide" 
-                  target="_blank" 
-                  className="flex items-center gap-2 text-sm text-red-400 hover:text-red-300 transition-colors group"
+            <div className="max-h-[350px] overflow-y-auto pr-2 custom-scrollbar space-y-3">
+              {rows.map((row, index) => (
+                <div
+                  key={index}
+                  className="flex flex-col sm:flex-row gap-3 items-start sm:items-center bg-[#151515] p-2 sm:p-3 rounded-2xl border border-white/5 hover:border-red-500/30 hover:bg-[#1a1a1a] transition-all group/row shadow-sm"
                 >
-                  <FaCircleInfo className="text-red-500 group-hover:scale-110 transition-transform" /> 
-                  <span>Format Guide</span>
-                  <FaArrowUpRightFromSquare className="text-xs" />
-                </Link>
-              </div>
+                  <div className="w-full sm:w-auto grow">
+                    <input
+                      type="text"
+                      placeholder="0x... Address"
+                      value={row.address}
+                      onChange={(e) =>
+                        handleInputChange(index, "address", e.target.value)
+                      }
+                      className="w-full bg-transparent border-none text-white focus:ring-0 placeholder-gray-600 font-mono text-sm px-3 py-2"
+                    />
+                  </div>
+                  {/* Fixed: w-[1px] -> w-px */}
+                  <div className="h-8 w-px bg-white/10 hidden sm:block"></div>
+                  <div className="relative w-full sm:w-32">
+                    <input
+                      type="number"
+                      placeholder="0.0"
+                      value={row.amount}
+                      onChange={(e) =>
+                        handleInputChange(index, "amount", e.target.value)
+                      }
+                      className="w-full bg-transparent border-none text-white focus:ring-0 placeholder-gray-600 text-right font-bold text-lg px-2"
+                    />
+                  </div>
+                  <div className="relative w-full sm:w-28 flex items-center gap-2">
+                    <div className="relative w-full">
+                      <select
+                        value={row.tokenType}
+                        onChange={(e) =>
+                          handleTokenTypeChange(
+                            index,
+                            e.target.value as "NATIVE" | "USDT" | "DAI"
+                          )
+                        }
+                        className="w-full appearance-none bg-white/5 border border-white/10 text-white rounded-lg px-3 py-2 text-xs font-bold focus:outline-none focus:border-red-500 transition-colors cursor-pointer hover:bg-white/10"
+                      >
+                        <option
+                          value="NATIVE"
+                          className="bg-[#151515] text-white"
+                        >
+                          LSK
+                        </option>
+                        <option
+                          value="USDT"
+                          className="bg-[#151515] text-white"
+                        >
+                          USDT
+                        </option>
+                        <option value="DAI" className="bg-[#151515] text-white">
+                          DAI
+                        </option>
+                      </select>
+                      <FaCaretDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none text-xs" />
+                    </div>
+                    {rows.length > 1 && (
+                      <button
+                        onClick={() => removeRow(index)}
+                        className="text-gray-600 hover:text-red-500 p-2 transition-colors rounded-lg hover:bg-red-500/10"
+                      >
+                        <FaTrash size={14} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
-          )}
-        </div>
-
-        {(isConfirmed || writeError) && (
-          <div className="mb-6">
-            {isConfirmed && <div className="p-3 bg-green-500/10 border border-green-500/30 text-green-400 rounded-lg flex items-center gap-2 text-sm"><FaCircleCheck /> Transfer Successful!</div>}
-            {writeError && <div className="p-3 bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg flex items-center gap-2 text-sm"><FaCircleExclamation /> {writeError.message.split("\n")[0]}</div>}
+            <button
+              onClick={addRow}
+              className="w-full py-3.5 border border-dashed border-white/10 rounded-2xl text-gray-500 hover:text-red-400 hover:border-red-500/30 hover:bg-red-500/5 transition-all flex items-center justify-center gap-2 text-sm font-bold mt-4 group"
+            >
+              <span className="bg-white/10 p-1 rounded-md group-hover:bg-red-500 group-hover:text-white transition-colors">
+                <FaPlus size={10} />
+              </span>{" "}
+              Add Another Recipient
+            </button>
           </div>
         )}
 
-        {!isConnected ? (
-          <button className="w-full bg-[#FF3B30] hover:bg-red-600 text-white font-bold text-lg py-4 rounded-xl transition-all shadow-[0_0_20px_rgba(255,59,48,0.3)]">Connect Wallet</button>
-        ) : needsApproval ? (
-          <button onClick={handleApprove} disabled={!canSubmit} className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold text-lg py-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-            {isPending || isConfirming ? "Approving USDT..." : `Approve USDT (${rows.filter(r => r.symbol === "USDT").length} txs)`}
-          </button>
-        ) : (
-          <button onClick={handleMultiPay} disabled={!canSubmit} className="w-full bg-[#FF3B30] hover:bg-red-600 text-white font-bold text-lg py-4 rounded-xl transition-all shadow-[0_0_20px_rgba(255,59,48,0.3)] disabled:opacity-50 disabled:cursor-not-allowed">
-            {isPending || isConfirming ? "Processing..." : `Transfer ${rows.length} Assets`}
-          </button>
+        {mode === "CSV" && (
+          <div className="animate-fade-in h-full flex flex-col">
+            <div className="relative grow group/textarea">
+              <textarea
+                readOnly
+                value={csvPreview}
+                placeholder={`Example Format:\n0x123...abc, 1.5, LSK\n0x456...def, 100, USDT\n0x789...ghi, 50, DAI`}
+                className="w-full h-48 bg-[#151515] border border-white/10 rounded-2xl p-5 text-sm text-gray-300 placeholder-gray-600 focus:border-red-500 focus:outline-none resize-none font-mono leading-relaxed transition-colors group-hover/textarea:border-white/20"
+              />
+            </div>
+            <div className="mt-6 flex flex-col sm:flex-row items-center gap-4">
+              <input
+                type="file"
+                accept=".csv"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              {/* Fixed: bg-gradient-to-b -> bg-linear-to-b */}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full sm:w-auto bg-linear-to-b from-[#222] to-[#111] border border-white/10 hover:border-white/30 text-white font-bold py-3 px-8 rounded-xl transition-all flex items-center justify-center gap-3 shadow-lg"
+              >
+                <FaFileCsv className="text-gray-400" /> Choose File
+              </button>
+              <Link
+                href="/dashboard/csv-guide"
+                target="_blank"
+                className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2 ml-auto group/link"
+              >
+                <FaCircleInfo className="text-red-500" /> CSV Format Guide{" "}
+                <FaArrowUpRightFromSquare className="text-xs group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5 transition-transform" />
+              </Link>
+            </div>
+          </div>
         )}
       </div>
+
+      {(isConfirmed || writeError || isReverted) && (
+        <div className="mb-6 animate-fade-in">
+          {isConfirmed && (
+            <div className="p-4 bg-green-500/10 border border-green-500/30 text-green-400 rounded-2xl flex items-center gap-4 shadow-[0_0_20px_rgba(34,197,94,0.1)]">
+              <div className="bg-green-500 text-black p-1.5 rounded-full">
+                <FaCircleCheck size={16} />
+              </div>
+              <div>
+                <p className="font-bold">Transaction Successful!</p>
+                <p className="text-xs opacity-80">
+                  Assets have been distributed to {rows.length} recipients.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {isReverted && (
+            <div className="p-4 bg-red-500/10 border border-red-500/30 text-red-400 rounded-2xl flex items-center gap-4 shadow-[0_0_20px_rgba(239,68,68,0.1)]">
+              <div className="bg-red-500 text-black p-1.5 rounded-full">
+                <FaCircleExclamation size={16} />
+              </div>
+              <div>
+                <p className="font-bold">Transaction Failed!</p>
+                <p className="text-xs opacity-80">
+                  The transaction was reverted on-chain. Please check token
+                  balances and allowances.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {writeError && (
+            <div className="p-4 bg-red-500/10 border border-red-500/30 text-red-400 rounded-2xl flex items-center gap-4 shadow-[0_0_20px_rgba(239,68,68,0.1)]">
+              <div className="bg-red-500 text-black p-1.5 rounded-full">
+                <FaCircleExclamation size={16} />
+              </div>
+              <p className="text-sm font-medium">
+                {writeError.message.split("\n")[0]}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!isConnected ? (
+        // Fixed: bg-gradient-to-r -> bg-linear-to-r
+        <button className="w-full bg-linear-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-bold text-lg py-5 rounded-2xl transition-all shadow-[0_0_30px_rgba(220,38,38,0.3)] hover:shadow-[0_0_50px_rgba(220,38,38,0.5)] transform active:scale-[0.98]">
+          Connect Wallet to Start
+        </button>
+      ) : needsApproveUSDT ? (
+        <button
+          onClick={() => handleApprove(USDT_ADDRESS)}
+          disabled={!canSubmit}
+          className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-extrabold text-lg py-5 rounded-2xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_30px_rgba(234,179,8,0.3)] hover:shadow-[0_0_50px_rgba(234,179,8,0.5)] transform active:scale-[0.98]"
+        >
+          {isPending || isConfirming
+            ? "Approving Access..."
+            : `Approve USDT (${
+                rows.filter((r) => r.tokenType === "USDT").length
+              } Transfers)`}
+        </button>
+      ) : needsApproveDAI ? (
+        <button
+          onClick={() => handleApprove(DAI_ADDRESS)}
+          disabled={!canSubmit}
+          className="w-full bg-orange-500 hover:bg-orange-400 text-black font-extrabold text-lg py-5 rounded-2xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_30px_rgba(249,115,22,0.3)] hover:shadow-[0_0_50px_rgba(249,115,22,0.5)] transform active:scale-[0.98]"
+        >
+          {isPending || isConfirming
+            ? "Approving Access..."
+            : `Approve DAI (${
+                rows.filter((r) => r.tokenType === "DAI").length
+              } Transfers)`}
+        </button>
+      ) : (
+        // Fixed: bg-gradient-to-r -> bg-linear-to-r
+        <button
+          onClick={handleMultiPay}
+          disabled={!canSubmit}
+          className="w-full bg-linear-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-extrabold text-lg py-5 rounded-2xl transition-all shadow-[0_0_30px_rgba(220,38,38,0.4)] hover:shadow-[0_0_40px_rgba(220,38,38,0.6)] disabled:opacity-50 disabled:cursor-not-allowed transform active:scale-[0.98] flex items-center justify-center gap-3 group"
+        >
+          {isPending || isConfirming ? (
+            "Processing Transaction..."
+          ) : (
+            <>
+              <FaRocket className="group-hover:rotate-12 transition-transform" />{" "}
+              Transfer {rows.length} Asset{rows.length > 1 ? "s" : ""}
+            </>
+          )}
+        </button>
+      )}
     </div>
   );
 }
