@@ -4,6 +4,7 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/landing/Footer";
 import {
+  DAI_ADDRESS,
   ENTERPRISE_ABI,
   ENTERPRISE_ADDRESS,
   ERC20_ABI,
@@ -16,7 +17,6 @@ import {
   FaBriefcase,
   FaCheck,
   FaCircleExclamation,
-  FaCoins,
   FaFileCsv,
   FaLandmark,
   FaMoneyBillTransfer,
@@ -48,7 +48,6 @@ export default function EnterprisePage() {
           <div className="fixed -top-40 -right-40 w-[600px] h-[600px] bg-yellow-600/10 rounded-full blur-[120px] pointer-events-none" />
           <div className="fixed bottom-0 left-0 right-0 h-[300px] bg-gradient-to-t from-yellow-900/10 to-transparent pointer-events-none" />
 
-          {/* PERBAIKAN: Hapus 'items-center' dan 'justify-center'. Biarkan full width. */}
           <div className="flex-grow w-full px-4 sm:px-8 pt-32 pb-20 relative z-10 flex flex-col items-center">
             <div className="w-full max-w-7xl">
               <HeaderSection />
@@ -106,6 +105,7 @@ function HeaderSection() {
 interface RowData {
   address: string;
   amount: string;
+  token: `0x${string}`;
 }
 
 function EnterpriseManager() {
@@ -221,6 +221,12 @@ function RegisterView({ onSuccess }: { onSuccess: () => void }) {
 function EnterpriseDashboard() {
   const { address } = useAccount();
   const [depositAmount, setDepositAmount] = useState("");
+
+  // STATE UNTUK TREASURY VIEW (Kiri)
+  const [treasuryViewToken, setTreasuryViewToken] =
+    useState<`0x${string}`>(USDT_ADDRESS);
+  const treasurySymbol = treasuryViewToken === USDT_ADDRESS ? "USDT" : "DAI";
+
   const {
     writeContract: writeDeposit,
     isPending: isDepPending,
@@ -231,7 +237,9 @@ function EnterpriseDashboard() {
   });
 
   const [mode, setMode] = useState<"MANUAL" | "CSV">("MANUAL");
-  const [rows, setRows] = useState<RowData[]>([{ address: "", amount: "" }]);
+  const [rows, setRows] = useState<RowData[]>([
+    { address: "", amount: "", token: USDT_ADDRESS },
+  ]);
   const [csvPreview, setCsvPreview] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -244,18 +252,30 @@ function EnterpriseDashboard() {
   const { isLoading: isPayConfirming, isSuccess: isPaySuccess } =
     useWaitForTransactionReceipt({ hash: payHash });
 
+  // READ DATA (Allowance & Yield)
   const { data: allowance, refetch: refetchAllowance } = useReadContract({
     abi: ERC20_ABI,
-    address: USDT_ADDRESS,
+    address: treasuryViewToken,
     functionName: "allowance",
     args: address ? [address, ENTERPRISE_ADDRESS] : undefined,
   });
-  const { data: yieldData, refetch: refetchYield } = useReadContract({
+
+  const { data: yieldUSDT, refetch: refetchYieldUSDT } = useReadContract({
     abi: ENTERPRISE_ABI,
     address: ENTERPRISE_ADDRESS,
     functionName: "getYield",
     args: address ? [address, USDT_ADDRESS] : undefined,
   });
+
+  const { data: yieldDAI, refetch: refetchYieldDAI } = useReadContract({
+    abi: ENTERPRISE_ABI,
+    address: ENTERPRISE_ADDRESS,
+    functionName: "getYield",
+    args: address ? [address, DAI_ADDRESS] : undefined,
+  });
+
+  const displayYield =
+    treasuryViewToken === USDT_ADDRESS ? yieldUSDT : yieldDAI;
 
   const depositValueBigInt = depositAmount
     ? parseEther(depositAmount)
@@ -263,43 +283,86 @@ function EnterpriseDashboard() {
   const needsApproval =
     allowance !== undefined && allowance < depositValueBigInt;
 
+  // HANDLERS
   const handleApprove = () =>
     writeDeposit({
-      address: USDT_ADDRESS,
+      address: treasuryViewToken,
       abi: ERC20_ABI,
       functionName: "approve",
       args: [ENTERPRISE_ADDRESS, maxUint256],
     });
+
   const handleDeposit = () => {
     if (depositAmount)
       writeDeposit({
         address: ENTERPRISE_ADDRESS,
         abi: ENTERPRISE_ABI,
         functionName: "deposit",
-        args: [USDT_ADDRESS, parseEther(depositAmount)],
+        args: [treasuryViewToken, parseEther(depositAmount)],
       });
   };
+
+  // --- UPDATE: GAS OPTIMIZED MULTI-TOKEN PAYROLL ---
+  // Fungsi ini sekarang menggunakan 'executePayrollMulti'
   const handleExecutePayroll = () => {
     try {
-      const recipients: `0x${string}`[] = [];
-      const amounts: bigint[] = [];
+      // 1. Grouping Data berdasarkan Token
+      const tokenGroups: Record<
+        string,
+        { recipients: `0x${string}`[]; amounts: bigint[] }
+      > = {};
+
+      let totalUSDTNeeded = 0n;
+      let totalDAINeeded = 0n;
+
       for (const row of rows) {
         if (
           !isAddress(row.address) ||
           !row.amount ||
           parseFloat(row.amount) <= 0
         ) {
-          alert(`Invalid input`);
+          alert(`Invalid input for ${row.address}`);
           return;
         }
-        recipients.push(row.address as `0x${string}`);
-        amounts.push(parseEther(row.amount));
+
+        const token = row.token;
+        const amountWei = parseEther(row.amount);
+
+        if (token === USDT_ADDRESS) totalUSDTNeeded += amountWei;
+        if (token === DAI_ADDRESS) totalDAINeeded += amountWei;
+
+        if (!tokenGroups[token]) {
+          tokenGroups[token] = { recipients: [], amounts: [] };
+        }
+        tokenGroups[token].recipients.push(row.address as `0x${string}`);
+        tokenGroups[token].amounts.push(amountWei);
       }
+
+      // 2. Cek Saldo Yield
+      const usdtAvailable = yieldUSDT || 0n;
+      const daiAvailable = yieldDAI || 0n;
+
+      if (totalUSDTNeeded > usdtAvailable) {
+        alert("Insufficient USDT Yield Balance in Enterprise Pool");
+        return;
+      }
+      if (totalDAINeeded > daiAvailable) {
+        alert("Insufficient DAI Yield Balance in Enterprise Pool");
+        return;
+      }
+
+      // 3. Prepare Arrays untuk executePayrollMulti
+      // Contract meminta: tokens[], recipients[][], amounts[][]
+      const tokensList = Object.keys(tokenGroups) as `0x${string}`[];
+      const recipientsList = tokensList.map((t) => tokenGroups[t].recipients);
+      const amountsList = tokensList.map((t) => tokenGroups[t].amounts);
+
+      // 4. Kirim SATU Transaksi (Gas Optimized)
       writePayroll({
         address: ENTERPRISE_ADDRESS,
         abi: ENTERPRISE_ABI,
-        functionName: "executePayroll",
-        args: [USDT_ADDRESS, recipients, amounts],
+        functionName: "executePayrollMulti", // <--- Fungsi Baru di Smart Contract
+        args: [tokensList, recipientsList, amountsList],
       });
     } catch (err) {
       console.error(err);
@@ -319,40 +382,50 @@ function EnterpriseDashboard() {
       const newRows: RowData[] = [];
       lines.forEach((l) => {
         const p = l.split(",").map((x) => x.trim());
-        if (p.length >= 2 && isAddress(p[0]) && !isNaN(parseFloat(p[1])))
-          newRows.push({ address: p[0], amount: p[1] });
+        if (p.length >= 2 && isAddress(p[0]) && !isNaN(parseFloat(p[1]))) {
+          const sym = p[2]?.toUpperCase();
+          let token: `0x${string}` = USDT_ADDRESS;
+          if (sym === "DAI") token = DAI_ADDRESS;
+          newRows.push({ address: p[0], amount: p[1], token });
+        }
       });
       if (newRows.length > 0) setRows(newRows);
     };
     reader.readAsText(file);
   };
 
-  const addRow = () => setRows([...rows, { address: "", amount: "" }]);
+  const addRow = () =>
+    setRows([...rows, { address: "", amount: "", token: USDT_ADDRESS }]);
   const removeRow = (i: number) => {
     const n = [...rows];
     n.splice(i, 1);
     setRows(n);
   };
-  const handleInputChange = (i: number, f: "address" | "amount", v: string) => {
+  const handleInputChange = (i: number, f: keyof RowData, v: string) => {
     const n = [...rows];
+    // @ts-ignore
     n[i][f] = v;
     setRows(n);
   };
-  const totalPayroll = rows.reduce(
-    (acc, row) => acc + (parseFloat(row.amount) || 0),
-    0
-  );
+
+  const totalPayrollUSDT = rows
+    .filter((r) => r.token === USDT_ADDRESS)
+    .reduce((acc, row) => acc + (parseFloat(row.amount) || 0), 0);
+  const totalPayrollDAI = rows
+    .filter((r) => r.token === DAI_ADDRESS)
+    .reduce((acc, row) => acc + (parseFloat(row.amount) || 0), 0);
 
   useEffect(() => {
     if (!isDepConfirming) {
       refetchAllowance();
-      refetchYield();
+      refetchYieldUSDT();
+      refetchYieldDAI();
     }
-  }, [isDepConfirming]);
+  }, [isDepConfirming, treasuryViewToken]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 w-full">
-      {/* --- LEFT: GOLD VAULT (FUNDING) --- */}
+      {/* --- LEFT: GOLD VAULT (TREASURY MANAGEMENT) --- */}
       <div className="lg:col-span-4 space-y-6">
         <div className="bg-[#0A0A0A] border border-yellow-600/30 rounded-3xl p-8 shadow-2xl relative overflow-hidden group h-full">
           <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 to-transparent pointer-events-none"></div>
@@ -364,20 +437,45 @@ function EnterpriseDashboard() {
               </span>
               Treasury
             </h3>
-            <div className="bg-yellow-900/20 border border-yellow-700/30 px-3 py-1 rounded-full text-xs font-mono text-yellow-500">
-              ASSET: USDT
+
+            {/* VIEW SELECTOR */}
+            <div className="flex bg-black/40 p-1 rounded-xl border border-yellow-500/20 backdrop-blur-sm">
+              <button
+                onClick={() => setTreasuryViewToken(USDT_ADDRESS)}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all duration-300 flex items-center gap-2 ${
+                  treasuryViewToken === USDT_ADDRESS
+                    ? "bg-yellow-500 text-black shadow-lg shadow-yellow-500/20"
+                    : "text-gray-500 hover:text-yellow-500"
+                }`}
+              >
+                {treasuryViewToken === USDT_ADDRESS && <FaCheck size={8} />}{" "}
+                USDT
+              </button>
+              <button
+                onClick={() => setTreasuryViewToken(DAI_ADDRESS)}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all duration-300 flex items-center gap-2 ${
+                  treasuryViewToken === DAI_ADDRESS
+                    ? "bg-yellow-500 text-black shadow-lg shadow-yellow-500/20"
+                    : "text-gray-500 hover:text-yellow-500"
+                }`}
+              >
+                {treasuryViewToken === DAI_ADDRESS && <FaCheck size={8} />} DAI
+              </button>
             </div>
           </div>
 
+          {/* BALANCE CARD */}
           <div className="bg-gradient-to-r from-[#1a1500] to-black border border-yellow-800/30 rounded-2xl p-6 mb-8 relative">
             <p className="text-xs text-yellow-600 font-bold tracking-[0.2em] uppercase mb-2">
               Accumulated Yield
             </p>
             <div className="flex items-baseline gap-2">
               <span className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-600 drop-shadow-sm">
-                +{yieldData ? formatEther(yieldData) : "0.00"}
+                +{displayYield ? formatEther(displayYield) : "0.00"}
               </span>
-              <span className="text-sm text-yellow-700 font-bold">USDT</span>
+              <span className="text-sm text-yellow-700 font-bold">
+                {treasurySymbol}
+              </span>
             </div>
             <div className="absolute top-0 right-0 w-20 h-20 bg-white/5 rounded-full blur-xl"></div>
           </div>
@@ -391,8 +489,8 @@ function EnterpriseDashboard() {
                 onChange={(e) => setDepositAmount(e.target.value)}
                 className="w-full bg-[#050505] border border-yellow-900/40 rounded-xl px-5 py-5 text-white focus:border-yellow-500 outline-none text-xl font-mono transition-colors group-hover/input:border-yellow-700/60"
               />
-              <span className="absolute right-5 top-1/2 -translate-y-1/2 text-sm font-bold text-yellow-600">
-                DEPOSIT USDT
+              <span className="absolute right-5 top-1/2 -translate-y-1/2 text-xs font-bold text-yellow-600 bg-yellow-900/10 px-2 py-1 rounded">
+                DEPOSIT {treasurySymbol}
               </span>
             </div>
 
@@ -428,7 +526,7 @@ function EnterpriseDashboard() {
                 Payroll Execution
               </h2>
               <p className="text-gray-500 text-sm mt-1">
-                Batch process salary distribution using accumulated yield.
+                Batch process salary distribution. (Multi-Token Supported)
               </p>
             </div>
 
@@ -464,7 +562,7 @@ function EnterpriseDashboard() {
                     key={index}
                     className="flex flex-col sm:flex-row gap-4 items-center animate-fade-in"
                   >
-                    <div className="w-8 h-8 rounded-full bg-yellow-900/20 text-yellow-600 flex items-center justify-center font-mono text-xs border border-yellow-900/30">
+                    <div className="w-8 h-8 rounded-full bg-yellow-900/20 text-yellow-600 flex items-center justify-center font-mono text-xs border border-yellow-900/30 shrink-0">
                       {index + 1}
                     </div>
                     <input
@@ -474,10 +572,10 @@ function EnterpriseDashboard() {
                       onChange={(e) =>
                         handleInputChange(index, "address", e.target.value)
                       }
-                      className="flex-grow bg-[#111] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-yellow-500 outline-none font-mono"
+                      className="flex-grow w-full sm:w-auto bg-[#111] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-yellow-500 outline-none font-mono"
                     />
                     <div className="flex gap-2 w-full sm:w-auto">
-                      <div className="relative w-full sm:w-40">
+                      <div className="relative w-[140px]">
                         <input
                           type="number"
                           placeholder="Amount"
@@ -485,16 +583,29 @@ function EnterpriseDashboard() {
                           onChange={(e) =>
                             handleInputChange(index, "amount", e.target.value)
                           }
-                          className="w-full bg-[#111] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-yellow-500 outline-none font-bold text-right"
+                          className="w-full bg-[#111] border border-white/10 rounded-xl pl-8 pr-3 py-3 text-sm text-white focus:border-yellow-500 outline-none font-bold text-right"
                         />
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-600">
                           $
                         </span>
                       </div>
+
+                      {/* --- ROW TOKEN SELECTOR --- */}
+                      <select
+                        value={row.token}
+                        onChange={(e) =>
+                          handleInputChange(index, "token", e.target.value)
+                        }
+                        className="bg-[#111] border border-white/10 text-white text-xs font-bold rounded-xl px-3 py-2 outline-none focus:border-yellow-500 cursor-pointer"
+                      >
+                        <option value={USDT_ADDRESS}>USDT</option>
+                        <option value={DAI_ADDRESS}>DAI</option>
+                      </select>
+
                       {rows.length > 1 && (
                         <button
                           onClick={() => removeRow(index)}
-                          className="w-12 bg-red-900/10 hover:bg-red-900/30 text-red-500 border border-red-900/20 rounded-xl flex items-center justify-center transition-colors"
+                          className="w-12 bg-red-900/10 hover:bg-red-900/30 text-red-500 border border-red-900/20 rounded-xl flex items-center justify-center transition-colors shrink-0"
                         >
                           <FaTrash size={14} />
                         </button>
@@ -513,7 +624,8 @@ function EnterpriseDashboard() {
               <div className="h-full flex flex-col items-center justify-center text-center p-8">
                 <FaFileCsv className="text-6xl text-yellow-800 mb-4" />
                 <p className="text-gray-300 mb-6">
-                  Upload your payroll CSV file for bulk processing.
+                  Upload your payroll CSV file. <br />
+                  Format: <code>address, amount, SYMBOL</code> (e.g. DAI/USDT)
                 </p>
                 <input
                   type="file"
@@ -539,44 +651,75 @@ function EnterpriseDashboard() {
           </div>
 
           <div className="border-t border-white/10 pt-6">
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <p className="text-gray-500 text-xs uppercase tracking-widest mb-1">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+              <div className="space-y-1">
+                <p className="text-gray-500 text-xs uppercase tracking-widest">
                   Total Allocation
                 </p>
-                <p className="text-3xl font-bold text-white">
-                  {totalPayroll.toLocaleString()}{" "}
-                  <span className="text-yellow-500 text-lg">USDT</span>
-                </p>
+                <div className="flex gap-4">
+                  {totalPayrollUSDT > 0 && (
+                    <p className="text-2xl font-bold text-white">
+                      {totalPayrollUSDT.toLocaleString()}{" "}
+                      <span className="text-yellow-500 text-sm">USDT</span>
+                    </p>
+                  )}
+                  {totalPayrollDAI > 0 && (
+                    <p className="text-2xl font-bold text-white">
+                      {totalPayrollDAI.toLocaleString()}{" "}
+                      <span className="text-orange-500 text-sm">DAI</span>
+                    </p>
+                  )}
+                  {totalPayrollUSDT === 0 && totalPayrollDAI === 0 && (
+                    <p className="text-2xl font-bold text-gray-600">0.00</p>
+                  )}
+                </div>
               </div>
-              {/* Visualizer Status */}
-              <div className="hidden sm:block text-right">
+
+              <div className="text-right">
                 <p className="text-gray-500 text-xs uppercase tracking-widest mb-1">
                   Pool Status
                 </p>
-                <p
-                  className={`font-bold flex items-center gap-2 justify-end ${
-                    parseFloat(formatEther(yieldData || BigInt(0))) >=
-                    totalPayroll
-                      ? "text-green-500"
-                      : "text-orange-500"
-                  }`}
-                >
-                  {parseFloat(formatEther(yieldData || BigInt(0))) >=
-                  totalPayroll ? (
-                    <>
-                      <FaCoins /> Covered by Yield
-                    </>
-                  ) : (
-                    "Partially Principal"
+                {/* Visualizer Status Sederhana */}
+                <div className="flex flex-col items-end gap-1">
+                  {totalPayrollUSDT > 0 && (
+                    <p
+                      className={`text-xs font-bold ${
+                        parseFloat(formatEther(yieldUSDT || 0n)) >=
+                        totalPayrollUSDT
+                          ? "text-green-500"
+                          : "text-red-500"
+                      }`}
+                    >
+                      USDT:{" "}
+                      {parseFloat(formatEther(yieldUSDT || 0n)) >=
+                      totalPayrollUSDT
+                        ? "Covered"
+                        : "Insufficient"}
+                    </p>
                   )}
-                </p>
+                  {totalPayrollDAI > 0 && (
+                    <p
+                      className={`text-xs font-bold ${
+                        parseFloat(formatEther(yieldDAI || 0n)) >=
+                        totalPayrollDAI
+                          ? "text-green-500"
+                          : "text-red-500"
+                      }`}
+                    >
+                      DAI:{" "}
+                      {parseFloat(formatEther(yieldDAI || 0n)) >=
+                      totalPayrollDAI
+                        ? "Covered"
+                        : "Insufficient"}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 
             {isPaySuccess && (
               <div className="mb-4 p-4 bg-green-900/20 border border-green-500/30 text-green-400 rounded-xl flex items-center gap-3">
-                <FaCheck /> Transfer Successful
+                <FaCheck /> Batch Transaction Successful
               </div>
             )}
             {payError && (
@@ -587,7 +730,11 @@ function EnterpriseDashboard() {
 
             <button
               onClick={handleExecutePayroll}
-              disabled={isPayPending || isPayConfirming || totalPayroll <= 0}
+              disabled={
+                isPayPending ||
+                isPayConfirming ||
+                (totalPayrollUSDT <= 0 && totalPayrollDAI <= 0)
+              }
               className="w-full bg-gradient-to-r from-yellow-600 via-yellow-500 to-yellow-600 hover:from-yellow-500 hover:to-yellow-400 text-black font-extrabold text-lg py-5 rounded-xl transition-all shadow-[0_0_30px_rgba(234,179,8,0.2)] disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transform active:scale-[0.99]"
             >
               {isPayPending || isPayConfirming ? (

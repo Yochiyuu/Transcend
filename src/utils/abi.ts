@@ -8,12 +8,12 @@
 export const CONTRACT_ADDRESS = "0x57472feF0B62745862F81E8020e17e94bCcA335b";
 
 // Contract Baru (Enterprise)
-export const ENTERPRISE_ADDRESS = "0x0695d1eE70a27541809ad6B06E42Ec84586026fa";
+export const ENTERPRISE_ADDRESS = "0x10b4D45da8bfD023438be5067aDc9B9a4E30b5D0";
 
 // Token Mock USDT
 export const USDT_ADDRESS = "0x69a58006574BBf7032afb321341661Db8754d21b";
 
-// Token Mock DAI (BARU - Tolong isi addressnya nanti)
+// Token Mock DAI
 export const DAI_ADDRESS = "0x72D7E7e9f7A4361fa3462B81AadeecA7f121CeED";
 
 // =================================================================
@@ -72,7 +72,6 @@ export const MULTI_SENDER_ABI = [
 ] as const;
 
 // --- ABI ERC20 (STANDARD & MOCK DAI) ---
-// ABI ini bisa dipakai untuk USDT maupun DAI karena sama-sama ERC20
 export const ERC20_ABI = [
   {
     inputs: [],
@@ -235,26 +234,283 @@ export const ERC20_ABI = [
   },
 ] as const;
 
-// --- ABI ENTERPRISE (COMPANY POOL) ---
+// --- ABI ENTERPRISE (COMPANY POOL - UPDATED) ---
 export const ENTERPRISE_ABI = [
   {
-    inputs: [],
-    name: "registerCompany",
-    outputs: [],
+    inputs: [
+      {
+        internalType: "address",
+        name: "_lendingPool",
+        type: "address",
+      },
+    ],
     stateMutability: "nonpayable",
-    type: "function",
+    type: "constructor",
   },
   {
-    inputs: [{ internalType: "address", name: "", type: "address" }],
+    inputs: [
+      {
+        internalType: "address",
+        name: "owner",
+        type: "address",
+      },
+    ],
+    name: "OwnableInvalidOwner",
+    type: "error",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "account",
+        type: "address",
+      },
+    ],
+    name: "OwnableUnauthorizedAccount",
+    type: "error",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "token",
+        type: "address",
+      },
+    ],
+    name: "SafeERC20FailedOperation",
+    type: "error",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "company",
+        type: "address",
+      },
+    ],
+    name: "CompanyRegistered",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "company",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "address",
+        name: "token",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "amount",
+        type: "uint256",
+      },
+    ],
+    name: "Deposited",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "previousOwner",
+        type: "address",
+      },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "newOwner",
+        type: "address",
+      },
+    ],
+    name: "OwnershipTransferred",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "company",
+        type: "address",
+      },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "token",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "address",
+        name: "recipient",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "amount",
+        type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "timestamp",
+        type: "uint256",
+      },
+    ],
+    name: "PayrollDetail",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "company",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "totalRecipients",
+        type: "uint256",
+      },
+    ],
+    name: "PayrollExecuted",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "company",
+        type: "address",
+      },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "token",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "address[]",
+        name: "recipients",
+        type: "address[]",
+      },
+      {
+        indexed: false,
+        internalType: "uint256[]",
+        name: "amounts",
+        type: "uint256[]",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "timestamp",
+        type: "uint256",
+      },
+    ],
+    name: "PayrollMultiDetail",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "company",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "address",
+        name: "token",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "amount",
+        type: "uint256",
+      },
+    ],
+    name: "Withdrawn",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "company",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "address",
+        name: "token",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "yieldAmount",
+        type: "uint256",
+      },
+    ],
+    name: "YieldUpdated",
+    type: "event",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
     name: "companyPools",
-    outputs: [{ internalType: "bool", name: "exists", type: "bool" }],
+    outputs: [
+      {
+        internalType: "bool",
+        name: "exists",
+        type: "bool",
+      },
+    ],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [
-      { internalType: "address", name: "token", type: "address" },
-      { internalType: "uint256", name: "amount", type: "uint256" },
+      {
+        internalType: "address",
+        name: "token",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "amount",
+        type: "uint256",
+      },
     ],
     name: "deposit",
     outputs: [],
@@ -263,9 +519,21 @@ export const ENTERPRISE_ABI = [
   },
   {
     inputs: [
-      { internalType: "address", name: "token", type: "address" },
-      { internalType: "address[]", name: "recipients", type: "address[]" },
-      { internalType: "uint256[]", name: "amounts", type: "uint256[]" },
+      {
+        internalType: "address",
+        name: "token",
+        type: "address",
+      },
+      {
+        internalType: "address[]",
+        name: "recipients",
+        type: "address[]",
+      },
+      {
+        internalType: "uint256[]",
+        name: "amounts",
+        type: "uint256[]",
+      },
     ],
     name: "executePayroll",
     outputs: [],
@@ -274,12 +542,206 @@ export const ENTERPRISE_ABI = [
   },
   {
     inputs: [
-      { internalType: "address", name: "company", type: "address" },
-      { internalType: "address", name: "token", type: "address" },
+      {
+        internalType: "address[]",
+        name: "tokens",
+        type: "address[]",
+      },
+      {
+        internalType: "address[][]",
+        name: "recipients",
+        type: "address[][]",
+      },
+      {
+        internalType: "uint256[][]",
+        name: "amounts",
+        type: "uint256[][]",
+      },
+    ],
+    name: "executePayrollMulti",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "company",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "token",
+        type: "address",
+      },
     ],
     name: "getYield",
-    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
     stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "lendingPool",
+    outputs: [
+      {
+        internalType: "contract IAaveLendingPool",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "owner",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "company",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "token",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "yieldAmount",
+        type: "uint256",
+      },
+    ],
+    name: "recordYield",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "registerCompany",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "renounceOwnership",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "token",
+        type: "address",
+      },
+      {
+        internalType: "bool",
+        name: "allowed",
+        type: "bool",
+      },
+    ],
+    name: "setTokenWhitelist",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "bool",
+        name: "enabled",
+        type: "bool",
+      },
+    ],
+    name: "toggleUseRealYield",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    name: "tokenWhitelist",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "newOwner",
+        type: "address",
+      },
+    ],
+    name: "transferOwnership",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "useRealYield",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "token",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "amount",
+        type: "uint256",
+      },
+    ],
+    name: "withdraw",
+    outputs: [],
+    stateMutability: "nonpayable",
     type: "function",
   },
 ] as const;
