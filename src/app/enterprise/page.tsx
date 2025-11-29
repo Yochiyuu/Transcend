@@ -8,7 +8,6 @@ import {
   ENTERPRISE_ABI,
   ENTERPRISE_ADDRESS,
   ERC20_ABI,
-  MOCK_LENDING_ABI,
   USDT_ADDRESS,
 } from "@/utils/abi";
 import { config } from "@/utils/config";
@@ -17,7 +16,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   FaBriefcase,
   FaCheck,
-  FaCircleExclamation, // UPDATED: FaCogs -> FaGears
+  FaCircleExclamation, // Menggunakan FaGears (pengganti FaCogs)
   FaFileCsv,
   FaGears,
   FaLandmark,
@@ -47,13 +46,10 @@ export default function EnterprisePage() {
           <Navbar />
 
           {/* --- BACKGROUND LUXURY GOLD --- */}
-          {/* UPDATED: bg-gradient -> bg-linear */}
           <div className="fixed top-0 left-0 w-full h-[800px] bg-linear-to-b from-yellow-900/20 via-amber-900/10 to-transparent pointer-events-none z-0" />
           <div className="fixed -top-40 -right-40 w-[600px] h-[600px] bg-yellow-600/10 rounded-full blur-[120px] pointer-events-none" />
-          {/* UPDATED: bg-gradient -> bg-linear */}
           <div className="fixed bottom-0 left-0 right-0 h-[300px] bg-linear-to-t from-yellow-900/10 to-transparent pointer-events-none" />
 
-          {/* UPDATED: flex-grow -> grow */}
           <div className="grow w-full px-4 sm:px-8 pt-32 pb-20 relative z-10 flex flex-col items-center">
             <div className="w-full max-w-7xl">
               <HeaderSection />
@@ -78,7 +74,7 @@ function HeaderSection() {
           <FaUserTie /> Corporate Suite
         </div>
         <h1 className="text-4xl sm:text-5xl font-bold text-white mb-2 tracking-tight">
-          Enterprise {/* UPDATED: bg-gradient -> bg-linear */}
+          Enterprise{" "}
           <span className="text-transparent bg-clip-text bg-linear-to-r from-yellow-300 via-yellow-500 to-amber-600">
             Treasury
           </span>
@@ -142,7 +138,6 @@ function EnterpriseManager() {
 
   if (!isConnected) {
     return (
-      // UPDATED: bg-gradient -> bg-linear
       <div className="flex flex-col items-center justify-center py-24 border border-yellow-900/30 rounded-3xl bg-linear-to-b from-yellow-900/10 to-black backdrop-blur-sm w-full max-w-2xl mx-auto">
         <div className="w-20 h-20 bg-yellow-500/10 rounded-full flex items-center justify-center mb-6 text-yellow-500 animate-pulse">
           <FaLandmark size={40} />
@@ -169,10 +164,9 @@ function EnterpriseManager() {
       <div className="fixed bottom-4 left-4 z-50">
         <button
           onClick={() => setShowAdmin(!showAdmin)}
-          className="p-3 bg-gray-900/80 hover:bg-red-900/80 text-gray-500 hover:text-white rounded-full transition-all border border-white/10"
+          className="p-3 bg-gray-900/80 hover:bg-red-900/80 text-gray-500 hover:text-white rounded-full transition-all border border-white/10 shadow-lg"
           title="Toggle Admin/Demo Panel"
         >
-          {/* UPDATED: FaCogs -> FaGears */}
           {showAdmin ? <FaLock /> : <FaGears />}
         </button>
       </div>
@@ -183,11 +177,12 @@ function EnterpriseManager() {
   );
 }
 
-// --- ADMIN / DEMO PANEL COMPONENT ---
+// --- ADMIN / DEMO PANEL COMPONENT (FIXED) ---
 function AdminPanel({ onClose }: { onClose: () => void }) {
+  // FIX: Panggil address dari useAccount disini
+  const { address } = useAccount();
   const { writeContract, isPending } = useWriteContract();
 
-  // Ambil address Lending Pool dari contract Enterprise secara otomatis
   const { data: lendingPoolAddress } = useReadContract({
     abi: ENTERPRISE_ABI,
     address: ENTERPRISE_ADDRESS,
@@ -203,27 +198,28 @@ function AdminPanel({ onClose }: { onClose: () => void }) {
     });
   };
 
+  // FIX: Gunakan recordYield agar aman jika lending pool 0x0
   const handleInjectYield = (token: `0x${string}`) => {
-    if (!lendingPoolAddress) return alert("Lending Pool not found");
+    if (!address) return alert("Wallet not connected");
+
     writeContract({
-      address: lendingPoolAddress,
-      abi: MOCK_LENDING_ABI,
-      functionName: "addMockYield",
-      args: [token, ENTERPRISE_ADDRESS, parseEther("500")], // Tambah 500 Token Yield
+      address: ENTERPRISE_ADDRESS,
+      abi: ENTERPRISE_ABI,
+      functionName: "recordYield",
+      args: [address, token, parseEther("500")], // Tambah 500 Token Yield
     });
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
       <div className="bg-[#111] border border-red-500/30 rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-500 hover:text-white"
+          className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
         >
           ✕
         </button>
 
-        {/* UPDATED: FaCogs -> FaGears */}
         <h3 className="text-xl font-bold text-red-500 mb-1 flex items-center gap-2">
           <FaGears /> Admin / Demo Panel
         </h3>
@@ -241,14 +237,14 @@ function AdminPanel({ onClose }: { onClose: () => void }) {
               <button
                 onClick={() => handleWhitelist(USDT_ADDRESS, "USDT")}
                 disabled={isPending}
-                className="bg-white/5 hover:bg-white/10 border border-white/10 p-2 rounded text-xs text-gray-300"
+                className="bg-white/5 hover:bg-white/10 border border-white/10 p-2 rounded text-xs text-gray-300 transition-colors"
               >
                 Whitelist USDT
               </button>
               <button
                 onClick={() => handleWhitelist(DAI_ADDRESS, "DAI")}
                 disabled={isPending}
-                className="bg-white/5 hover:bg-white/10 border border-white/10 p-2 rounded text-xs text-gray-300"
+                className="bg-white/5 hover:bg-white/10 border border-white/10 p-2 rounded text-xs text-gray-300 transition-colors"
               >
                 Whitelist DAI
               </button>
@@ -263,15 +259,15 @@ function AdminPanel({ onClose }: { onClose: () => void }) {
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => handleInjectYield(USDT_ADDRESS)}
-                disabled={isPending || !lendingPoolAddress}
-                className="bg-green-900/20 hover:bg-green-900/40 border border-green-500/20 p-2 rounded text-xs text-green-400"
+                disabled={isPending}
+                className="bg-green-900/20 hover:bg-green-900/40 border border-green-500/20 p-2 rounded text-xs text-green-400 transition-colors"
               >
                 Inject USDT Yield
               </button>
               <button
                 onClick={() => handleInjectYield(DAI_ADDRESS)}
-                disabled={isPending || !lendingPoolAddress}
-                className="bg-orange-900/20 hover:bg-orange-900/40 border border-orange-500/20 p-2 rounded text-xs text-orange-400"
+                disabled={isPending}
+                className="bg-orange-900/20 hover:bg-orange-900/40 border border-orange-500/20 p-2 rounded text-xs text-orange-400 transition-colors"
               >
                 Inject DAI Yield
               </button>
@@ -297,10 +293,8 @@ function RegisterView({ onSuccess }: { onSuccess: () => void }) {
     <div className="max-w-2xl mx-auto mt-8">
       <div className="bg-black/60 border border-yellow-600/40 rounded-3xl p-10 text-center shadow-[0_0_50px_rgba(234,179,8,0.1)] relative overflow-hidden backdrop-blur-xl">
         <div className="absolute -top-20 -left-20 w-60 h-60 bg-yellow-500/20 rounded-full blur-3xl"></div>
-        {/* UPDATED: bg-gradient -> bg-linear */}
         <div className="absolute top-0 right-0 w-full h-1 bg-linear-to-l from-yellow-600 via-yellow-300 to-transparent"></div>
 
-        {/* UPDATED: bg-gradient -> bg-linear */}
         <div className="w-24 h-24 bg-linear-to-br from-yellow-600 to-yellow-900 rounded-2xl flex items-center justify-center mx-auto mb-8 shadow-lg shadow-yellow-900/50 transform rotate-3 hover:rotate-0 transition-all duration-500">
           <FaBriefcase size={40} className="text-white drop-shadow-md" />
         </div>
@@ -327,7 +321,6 @@ function RegisterView({ onSuccess }: { onSuccess: () => void }) {
           </div>
         )}
 
-        {/* UPDATED: bg-gradient -> bg-linear */}
         <button
           onClick={() =>
             writeContract({
@@ -578,12 +571,10 @@ function EnterpriseDashboard() {
       {/* --- LEFT: GOLD VAULT (TREASURY MANAGEMENT) --- */}
       <div className="lg:col-span-4 space-y-6">
         <div className="bg-[#0A0A0A] border border-yellow-600/30 rounded-3xl p-8 shadow-2xl relative overflow-hidden group h-full flex flex-col">
-          {/* UPDATED: bg-gradient -> bg-linear */}
           <div className="absolute inset-0 bg-linear-to-br from-yellow-500/10 to-transparent pointer-events-none"></div>
 
           <div className="flex items-center justify-between mb-8 relative z-10">
             <h3 className="text-xl font-bold text-white flex items-center gap-3">
-              {/* UPDATED: bg-gradient -> bg-linear */}
               <span className="w-10 h-10 bg-linear-to-b from-yellow-400 to-yellow-700 rounded-lg flex items-center justify-center text-black shadow-lg">
                 <FaLandmark />
               </span>
@@ -617,13 +608,11 @@ function EnterpriseDashboard() {
           </div>
 
           {/* BALANCE CARD */}
-          {/* UPDATED: bg-gradient -> bg-linear */}
           <div className="bg-linear-to-r from-[#1a1500] to-black border border-yellow-800/30 rounded-2xl p-6 mb-8 relative">
             <p className="text-xs text-yellow-600 font-bold tracking-[0.2em] uppercase mb-2">
               Accumulated Yield
             </p>
             <div className="flex items-baseline gap-2">
-              {/* UPDATED: bg-gradient -> bg-linear */}
               <span className="text-4xl font-bold text-transparent bg-clip-text bg-linear-to-r from-yellow-200 via-yellow-400 to-yellow-600 drop-shadow-sm">
                 +{displayYield ? formatEther(displayYield) : "0.00"}
               </span>
@@ -658,7 +647,6 @@ function EnterpriseDashboard() {
                 {isDepPending ? "Approving Access..." : "1. Approve Contract"}
               </button>
             ) : (
-              // UPDATED: bg-gradient -> bg-linear
               <button
                 onClick={handleDeposit}
                 disabled={isDepPending || isDepConfirming || !depositAmount}
@@ -746,7 +734,6 @@ function EnterpriseDashboard() {
                     <div className="w-8 h-8 rounded-full bg-yellow-900/20 text-yellow-600 flex items-center justify-center font-mono text-xs border border-yellow-900/30 shrink-0">
                       {index + 1}
                     </div>
-                    {/* UPDATED: flex-grow -> grow */}
                     <input
                       type="text"
                       placeholder="Recipient Wallet (0x...)"
@@ -910,7 +897,6 @@ function EnterpriseDashboard() {
               </div>
             )}
 
-            {/* UPDATED: bg-gradient -> bg-linear */}
             <button
               onClick={handleExecutePayroll}
               disabled={
