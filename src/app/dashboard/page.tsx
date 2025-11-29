@@ -25,10 +25,12 @@ import {
   FaRocket,
   FaTrash,
   FaUsers,
+  FaWallet, // Import icon wallet
 } from "react-icons/fa6";
 import { isAddress, maxUint256, parseEther } from "viem";
 import {
   useAccount,
+  useConnect,
   useReadContract,
   useWaitForTransactionReceipt,
   useWriteContract,
@@ -89,6 +91,8 @@ interface RowData {
 
 function DashboardForm() {
   const { address, isConnected } = useAccount();
+  const { connectAsync, connectors } = useConnect(); // Hook koneksi
+
   const {
     data: hash,
     writeContract,
@@ -120,6 +124,39 @@ function DashboardForm() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // --- FUNGSI CONNECT BARU UNTUK DASHBOARD ---
+  const handleConnectDashboard = async () => {
+    try {
+      let connector = connectors.find((c) => c.id === "injected");
+
+      // Fallback ke WalletConnect jika di mobile atau tidak ada injected provider
+      if (
+        !connector ||
+        typeof window === "undefined" ||
+        !(window as any).ethereum
+      ) {
+        connector = connectors.find((c) => c.id === "walletConnect");
+      }
+
+      if (connector) {
+        await connectAsync({ connector, chainId: config.chains[0].id });
+      } else {
+        alert("Wallet Connector tidak ditemukan.");
+      }
+    } catch (err: any) {
+      if (
+        err.name === "UserRejectedRequestError" ||
+        err.message.includes("User rejected") ||
+        err.message.includes("rejected")
+      ) {
+        console.log("User cancelled connection");
+        return;
+      }
+      console.error("Connect error:", err);
+    }
+  };
+  // -------------------------------------------
 
   const { data: allowanceUSDT, refetch: refetchAllowanceUSDT } =
     useReadContract({
@@ -490,8 +527,11 @@ function DashboardForm() {
 
       {!isConnected ? (
         // Fixed: bg-gradient-to-r -> bg-linear-to-r
-        <button className="w-full bg-linear-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-bold text-lg py-5 rounded-2xl transition-all shadow-[0_0_30px_rgba(220,38,38,0.3)] hover:shadow-[0_0_50px_rgba(220,38,38,0.5)] transform active:scale-[0.98]">
-          Connect Wallet to Start
+        <button
+          onClick={handleConnectDashboard}
+          className="w-full bg-linear-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-bold text-lg py-5 rounded-2xl transition-all shadow-[0_0_30px_rgba(220,38,38,0.3)] hover:shadow-[0_0_50px_rgba(220,38,38,0.5)] transform active:scale-[0.98] flex items-center justify-center gap-3 cursor-pointer"
+        >
+          <FaWallet /> Connect Wallet to Start
         </button>
       ) : needsApproveUSDT ? (
         <button

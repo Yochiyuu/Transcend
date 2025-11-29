@@ -23,7 +23,7 @@ const spaceGrotesk = Space_Grotesk({ subsets: ["latin"] });
 
 export default function Navbar() {
   const { address, isConnected } = useAccount();
-  const { connectAsync, connectors } = useConnect(); // PAKE connectAsync BIAR BISA DI-CATCH
+  const { connectAsync, connectors } = useConnect();
   const { disconnect } = useDisconnect();
   const pathname = usePathname();
 
@@ -37,40 +37,46 @@ export default function Navbar() {
 
   const handleConnect = async () => {
     try {
-      // 1. Cari Connector MetaMask (Injected)
-      const injectedConnector = connectors.find((c) => c.id === "injected");
+      // --- LOGIKA BARU: SMART SELECTION ---
+      // 1. Coba cari Injected (Metamask Extension di PC)
+      let connector = connectors.find((c) => c.id === "injected");
 
-      if (!injectedConnector) {
-        alert("Wallet tidak ditemukan. Pastikan MetaMask terinstall.");
+      // 2. Jika Injected tidak ready (misal di HP Chrome), gunakan WalletConnect
+      // WalletConnect (Reown) bisa handle QR Code (PC) dan Deep Link (HP)
+      if (
+        !connector ||
+        typeof window === "undefined" ||
+        !(window as any).ethereum
+      ) {
+        connector = connectors.find((c) => c.id === "walletConnect");
+      }
+
+      if (!connector) {
+        alert("Tidak ada metode koneksi yang tersedia.");
         return;
       }
 
-      // 2. Disconnect sesi lama jika ada (biar bersih)
+      // 3. Disconnect sesi lama jika ada
       if (isConnected) {
         await disconnect();
       }
 
-      // 3. Coba Connect
+      // 4. Eksekusi Connect
       await connectAsync({
-        connector: injectedConnector,
+        connector,
         chainId: config.chains[0].id,
       });
     } catch (err: any) {
-      // --- PENANGANAN ERROR (SILENT MODE) ---
-
-      // Jika user menutup popup / reject request -> DIAM SAJA (Jangan Alert, Jangan Error)
       if (
         err.name === "UserRejectedRequestError" ||
         err.message.includes("User rejected") ||
         err.message.includes("rejected")
       ) {
-        console.log("User membatalkan koneksi (Aman).");
+        console.log("User membatalkan koneksi.");
         return;
       }
-
-      // Kalau error lain (misal jaringan putus), baru kasih tau
       console.error("Connect Error:", err);
-      alert("Gagal connect: " + err.message);
+      // alert("Gagal connect: " + err.message); // Opsional: matikan alert jika mengganggu
     }
   };
 
@@ -148,9 +154,8 @@ export default function Navbar() {
         <div className="flex items-center gap-4">
           {mounted ? (
             !isConnected ? (
-              // TOMBOL CONNECT TUNGGAL (MERAH)
               <button
-                onClick={handleConnect}
+                onClick={handleConnect} // <--- PASTIKAN INI TERPANGGIL
                 className="group relative inline-flex items-center justify-center px-6 py-2.5 overflow-hidden font-bold text-white transition-all duration-300 bg-red-600 rounded-xl hover:bg-red-700 shadow-[0_0_20px_rgba(220,38,38,0.3)] hover:shadow-[0_0_30px_rgba(220,38,38,0.5)] active:scale-95 cursor-pointer"
               >
                 <span className="relative flex items-center gap-2">
@@ -158,7 +163,6 @@ export default function Navbar() {
                 </span>
               </button>
             ) : (
-              // TAMPILAN SESUDAH CONNECT
               <div className="flex items-center bg-[#1A1A1D] border border-white/10 rounded-xl p-1 shadow-lg">
                 <div className="hidden sm:flex items-center px-3 border-r border-white/5">
                   <span className="text-sm font-bold text-gray-200">
