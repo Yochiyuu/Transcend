@@ -13,7 +13,7 @@ body {
   overflow-x: hidden;
 }
 
-/* AURORA BACKGROUND EFFECT */
+/* --- AURORA BACKGROUND EFFECT --- */
 .aurora-bg {
   background-color: #000000;
   background-image:
@@ -50,4 +50,31 @@ body {
     background-position: 0% 50%;
     transform: translate(-50%, -50%) rotate(0deg);
   }
+}
+
+/* --- FIX Z-INDEX MODAL WALLETCONNECT (SAPU JAGAT) --- */
+/* Agar QR Code muncul paling depan di atas dashboard */
+
+/* Target untuk Web3Modal / WalletConnect Versi Baru (w3m) */
+w3m-modal {
+  position: relative;
+  z-index: 2147483647 !important;
+  /* Level Tertinggi */
+}
+
+/* Target untuk Web3Modal Versi Lama (wcm) */
+wcm-modal {
+  position: relative;
+  z-index: 2147483647 !important;
+}
+
+/* Target untuk Overlay/Background Gelap */
+.w3m-overlay, .wcm-overlay {
+  z-index: 2147483646 !important;
+}
+
+/* Target Reset CSS Variable Web3Modal agar tidak ketutup parent */
+:root {
+  --w3m-z-index: 2147483647 !important;
+  --wcm-z-index: 2147483647 !important;
 }
