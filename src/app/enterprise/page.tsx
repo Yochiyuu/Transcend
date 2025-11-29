@@ -8,6 +8,7 @@ import {
   ENTERPRISE_ABI,
   ENTERPRISE_ADDRESS,
   ERC20_ABI,
+  MOCK_LENDING_ABI,
   USDT_ADDRESS,
 } from "@/utils/abi";
 import { config } from "@/utils/config";
@@ -16,9 +17,11 @@ import { useEffect, useRef, useState } from "react";
 import {
   FaBriefcase,
   FaCheck,
-  FaCircleExclamation,
+  FaCircleExclamation, // UPDATED: FaCogs -> FaGears
   FaFileCsv,
+  FaGears,
   FaLandmark,
+  FaLock,
   FaMoneyBillTransfer,
   FaPlus,
   FaTrash,
@@ -44,11 +47,14 @@ export default function EnterprisePage() {
           <Navbar />
 
           {/* --- BACKGROUND LUXURY GOLD --- */}
-          <div className="fixed top-0 left-0 w-full h-[800px] bg-gradient-to-b from-yellow-900/20 via-amber-900/10 to-transparent pointer-events-none z-0" />
+          {/* UPDATED: bg-gradient -> bg-linear */}
+          <div className="fixed top-0 left-0 w-full h-[800px] bg-linear-to-b from-yellow-900/20 via-amber-900/10 to-transparent pointer-events-none z-0" />
           <div className="fixed -top-40 -right-40 w-[600px] h-[600px] bg-yellow-600/10 rounded-full blur-[120px] pointer-events-none" />
-          <div className="fixed bottom-0 left-0 right-0 h-[300px] bg-gradient-to-t from-yellow-900/10 to-transparent pointer-events-none" />
+          {/* UPDATED: bg-gradient -> bg-linear */}
+          <div className="fixed bottom-0 left-0 right-0 h-[300px] bg-linear-to-t from-yellow-900/10 to-transparent pointer-events-none" />
 
-          <div className="flex-grow w-full px-4 sm:px-8 pt-32 pb-20 relative z-10 flex flex-col items-center">
+          {/* UPDATED: flex-grow -> grow */}
+          <div className="grow w-full px-4 sm:px-8 pt-32 pb-20 relative z-10 flex flex-col items-center">
             <div className="w-full max-w-7xl">
               <HeaderSection />
               <EnterpriseManager />
@@ -72,8 +78,8 @@ function HeaderSection() {
           <FaUserTie /> Corporate Suite
         </div>
         <h1 className="text-4xl sm:text-5xl font-bold text-white mb-2 tracking-tight">
-          Enterprise{" "}
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-yellow-500 to-amber-600">
+          Enterprise {/* UPDATED: bg-gradient -> bg-linear */}
+          <span className="text-transparent bg-clip-text bg-linear-to-r from-yellow-300 via-yellow-500 to-amber-600">
             Treasury
           </span>
         </h1>
@@ -111,6 +117,7 @@ interface RowData {
 function EnterpriseManager() {
   const { address, isConnected } = useAccount();
   const [mounted, setMounted] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false); // Toggle Admin Panel
 
   useEffect(() => {
     setMounted(true);
@@ -135,7 +142,8 @@ function EnterpriseManager() {
 
   if (!isConnected) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 border border-yellow-900/30 rounded-3xl bg-gradient-to-b from-yellow-900/10 to-black backdrop-blur-sm w-full max-w-2xl mx-auto">
+      // UPDATED: bg-gradient -> bg-linear
+      <div className="flex flex-col items-center justify-center py-24 border border-yellow-900/30 rounded-3xl bg-linear-to-b from-yellow-900/10 to-black backdrop-blur-sm w-full max-w-2xl mx-auto">
         <div className="w-20 h-20 bg-yellow-500/10 rounded-full flex items-center justify-center mb-6 text-yellow-500 animate-pulse">
           <FaLandmark size={40} />
         </div>
@@ -153,7 +161,126 @@ function EnterpriseManager() {
     return <RegisterView onSuccess={refetchCompany} />;
   }
 
-  return <EnterpriseDashboard />;
+  return (
+    <>
+      <EnterpriseDashboard />
+
+      {/* ADMIN TOGGLE BUTTON (HIDDEN BOTTOM LEFT) */}
+      <div className="fixed bottom-4 left-4 z-50">
+        <button
+          onClick={() => setShowAdmin(!showAdmin)}
+          className="p-3 bg-gray-900/80 hover:bg-red-900/80 text-gray-500 hover:text-white rounded-full transition-all border border-white/10"
+          title="Toggle Admin/Demo Panel"
+        >
+          {/* UPDATED: FaCogs -> FaGears */}
+          {showAdmin ? <FaLock /> : <FaGears />}
+        </button>
+      </div>
+
+      {/* ADMIN PANEL */}
+      {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
+    </>
+  );
+}
+
+// --- ADMIN / DEMO PANEL COMPONENT ---
+function AdminPanel({ onClose }: { onClose: () => void }) {
+  const { writeContract, isPending } = useWriteContract();
+
+  // Ambil address Lending Pool dari contract Enterprise secara otomatis
+  const { data: lendingPoolAddress } = useReadContract({
+    abi: ENTERPRISE_ABI,
+    address: ENTERPRISE_ADDRESS,
+    functionName: "lendingPool",
+  });
+
+  const handleWhitelist = (token: `0x${string}`, symbol: string) => {
+    writeContract({
+      address: ENTERPRISE_ADDRESS,
+      abi: ENTERPRISE_ABI,
+      functionName: "setTokenWhitelist",
+      args: [token, true],
+    });
+  };
+
+  const handleInjectYield = (token: `0x${string}`) => {
+    if (!lendingPoolAddress) return alert("Lending Pool not found");
+    writeContract({
+      address: lendingPoolAddress,
+      abi: MOCK_LENDING_ABI,
+      functionName: "addMockYield",
+      args: [token, ENTERPRISE_ADDRESS, parseEther("500")], // Tambah 500 Token Yield
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+      <div className="bg-[#111] border border-red-500/30 rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-gray-500 hover:text-white"
+        >
+          ✕
+        </button>
+
+        {/* UPDATED: FaCogs -> FaGears */}
+        <h3 className="text-xl font-bold text-red-500 mb-1 flex items-center gap-2">
+          <FaGears /> Admin / Demo Panel
+        </h3>
+        <p className="text-xs text-gray-500 mb-6">
+          Use this to setup your demo environment quickly.
+        </p>
+
+        <div className="space-y-6">
+          {/* 1. WHITELIST SECTION */}
+          <div>
+            <p className="text-sm font-bold text-white mb-2">
+              1. Whitelist Tokens
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => handleWhitelist(USDT_ADDRESS, "USDT")}
+                disabled={isPending}
+                className="bg-white/5 hover:bg-white/10 border border-white/10 p-2 rounded text-xs text-gray-300"
+              >
+                Whitelist USDT
+              </button>
+              <button
+                onClick={() => handleWhitelist(DAI_ADDRESS, "DAI")}
+                disabled={isPending}
+                className="bg-white/5 hover:bg-white/10 border border-white/10 p-2 rounded text-xs text-gray-300"
+              >
+                Whitelist DAI
+              </button>
+            </div>
+          </div>
+
+          {/* 2. YIELD SECTION */}
+          <div>
+            <p className="text-sm font-bold text-white mb-2">
+              2. Inject Mock Yield (+500)
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => handleInjectYield(USDT_ADDRESS)}
+                disabled={isPending || !lendingPoolAddress}
+                className="bg-green-900/20 hover:bg-green-900/40 border border-green-500/20 p-2 rounded text-xs text-green-400"
+              >
+                Inject USDT Yield
+              </button>
+              <button
+                onClick={() => handleInjectYield(DAI_ADDRESS)}
+                disabled={isPending || !lendingPoolAddress}
+                className="bg-orange-900/20 hover:bg-orange-900/40 border border-orange-500/20 p-2 rounded text-xs text-orange-400"
+              >
+                Inject DAI Yield
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function RegisterView({ onSuccess }: { onSuccess: () => void }) {
@@ -170,9 +297,11 @@ function RegisterView({ onSuccess }: { onSuccess: () => void }) {
     <div className="max-w-2xl mx-auto mt-8">
       <div className="bg-black/60 border border-yellow-600/40 rounded-3xl p-10 text-center shadow-[0_0_50px_rgba(234,179,8,0.1)] relative overflow-hidden backdrop-blur-xl">
         <div className="absolute -top-20 -left-20 w-60 h-60 bg-yellow-500/20 rounded-full blur-3xl"></div>
-        <div className="absolute top-0 right-0 w-full h-1 bg-gradient-to-l from-yellow-600 via-yellow-300 to-transparent"></div>
+        {/* UPDATED: bg-gradient -> bg-linear */}
+        <div className="absolute top-0 right-0 w-full h-1 bg-linear-to-l from-yellow-600 via-yellow-300 to-transparent"></div>
 
-        <div className="w-24 h-24 bg-gradient-to-br from-yellow-600 to-yellow-900 rounded-2xl flex items-center justify-center mx-auto mb-8 shadow-lg shadow-yellow-900/50 transform rotate-3 hover:rotate-0 transition-all duration-500">
+        {/* UPDATED: bg-gradient -> bg-linear */}
+        <div className="w-24 h-24 bg-linear-to-br from-yellow-600 to-yellow-900 rounded-2xl flex items-center justify-center mx-auto mb-8 shadow-lg shadow-yellow-900/50 transform rotate-3 hover:rotate-0 transition-all duration-500">
           <FaBriefcase size={40} className="text-white drop-shadow-md" />
         </div>
 
@@ -198,6 +327,7 @@ function RegisterView({ onSuccess }: { onSuccess: () => void }) {
           </div>
         )}
 
+        {/* UPDATED: bg-gradient -> bg-linear */}
         <button
           onClick={() =>
             writeContract({
@@ -207,7 +337,7 @@ function RegisterView({ onSuccess }: { onSuccess: () => void }) {
             })
           }
           disabled={isPending || isConfirming}
-          className="w-full bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 text-black font-bold text-lg py-5 rounded-xl transition-all shadow-lg shadow-yellow-600/20 hover:shadow-yellow-500/40 disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wide"
+          className="w-full bg-linear-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 text-black font-bold text-lg py-5 rounded-xl transition-all shadow-lg shadow-yellow-600/20 hover:shadow-yellow-500/40 disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wide"
         >
           {isPending || isConfirming
             ? "Processing Registration..."
@@ -221,12 +351,14 @@ function RegisterView({ onSuccess }: { onSuccess: () => void }) {
 function EnterpriseDashboard() {
   const { address } = useAccount();
   const [depositAmount, setDepositAmount] = useState("");
+  const [withdrawAmount, setWithdrawAmount] = useState(""); // State baru untuk withdraw
 
   // STATE UNTUK TREASURY VIEW (Kiri)
   const [treasuryViewToken, setTreasuryViewToken] =
     useState<`0x${string}`>(USDT_ADDRESS);
   const treasurySymbol = treasuryViewToken === USDT_ADDRESS ? "USDT" : "DAI";
 
+  // WRITE DEPOSIT
   const {
     writeContract: writeDeposit,
     isPending: isDepPending,
@@ -234,6 +366,16 @@ function EnterpriseDashboard() {
   } = useWriteContract();
   const { isLoading: isDepConfirming } = useWaitForTransactionReceipt({
     hash: depHash,
+  });
+
+  // WRITE WITHDRAW
+  const {
+    writeContract: writeWithdraw,
+    isPending: isWithPending,
+    data: withHash,
+  } = useWriteContract();
+  const { isLoading: isWithConfirming } = useWaitForTransactionReceipt({
+    hash: withHash,
   });
 
   const [mode, setMode] = useState<"MANUAL" | "CSV">("MANUAL");
@@ -302,8 +444,17 @@ function EnterpriseDashboard() {
       });
   };
 
-  // --- UPDATE: GAS OPTIMIZED MULTI-TOKEN PAYROLL ---
-  // Fungsi ini sekarang menggunakan 'executePayrollMulti'
+  const handleWithdraw = () => {
+    if (withdrawAmount)
+      writeWithdraw({
+        address: ENTERPRISE_ADDRESS,
+        abi: ENTERPRISE_ABI,
+        functionName: "withdraw",
+        args: [treasuryViewToken, parseEther(withdrawAmount)],
+      });
+  };
+
+  // --- GAS OPTIMIZED MULTI-TOKEN PAYROLL ---
   const handleExecutePayroll = () => {
     try {
       // 1. Grouping Data berdasarkan Token
@@ -352,16 +503,15 @@ function EnterpriseDashboard() {
       }
 
       // 3. Prepare Arrays untuk executePayrollMulti
-      // Contract meminta: tokens[], recipients[][], amounts[][]
       const tokensList = Object.keys(tokenGroups) as `0x${string}`[];
       const recipientsList = tokensList.map((t) => tokenGroups[t].recipients);
       const amountsList = tokensList.map((t) => tokenGroups[t].amounts);
 
-      // 4. Kirim SATU Transaksi (Gas Optimized)
+      // 4. Kirim Transaksi
       writePayroll({
         address: ENTERPRISE_ADDRESS,
         abi: ENTERPRISE_ABI,
-        functionName: "executePayrollMulti", // <--- Fungsi Baru di Smart Contract
+        functionName: "executePayrollMulti",
         args: [tokensList, recipientsList, amountsList],
       });
     } catch (err) {
@@ -416,23 +566,25 @@ function EnterpriseDashboard() {
     .reduce((acc, row) => acc + (parseFloat(row.amount) || 0), 0);
 
   useEffect(() => {
-    if (!isDepConfirming) {
+    if (!isDepConfirming || !isWithConfirming) {
       refetchAllowance();
       refetchYieldUSDT();
       refetchYieldDAI();
     }
-  }, [isDepConfirming, treasuryViewToken]);
+  }, [isDepConfirming, isWithConfirming, treasuryViewToken]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 w-full">
       {/* --- LEFT: GOLD VAULT (TREASURY MANAGEMENT) --- */}
       <div className="lg:col-span-4 space-y-6">
-        <div className="bg-[#0A0A0A] border border-yellow-600/30 rounded-3xl p-8 shadow-2xl relative overflow-hidden group h-full">
-          <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 to-transparent pointer-events-none"></div>
+        <div className="bg-[#0A0A0A] border border-yellow-600/30 rounded-3xl p-8 shadow-2xl relative overflow-hidden group h-full flex flex-col">
+          {/* UPDATED: bg-gradient -> bg-linear */}
+          <div className="absolute inset-0 bg-linear-to-br from-yellow-500/10 to-transparent pointer-events-none"></div>
 
           <div className="flex items-center justify-between mb-8 relative z-10">
             <h3 className="text-xl font-bold text-white flex items-center gap-3">
-              <span className="w-10 h-10 bg-gradient-to-b from-yellow-400 to-yellow-700 rounded-lg flex items-center justify-center text-black shadow-lg">
+              {/* UPDATED: bg-gradient -> bg-linear */}
+              <span className="w-10 h-10 bg-linear-to-b from-yellow-400 to-yellow-700 rounded-lg flex items-center justify-center text-black shadow-lg">
                 <FaLandmark />
               </span>
               Treasury
@@ -465,12 +617,14 @@ function EnterpriseDashboard() {
           </div>
 
           {/* BALANCE CARD */}
-          <div className="bg-gradient-to-r from-[#1a1500] to-black border border-yellow-800/30 rounded-2xl p-6 mb-8 relative">
+          {/* UPDATED: bg-gradient -> bg-linear */}
+          <div className="bg-linear-to-r from-[#1a1500] to-black border border-yellow-800/30 rounded-2xl p-6 mb-8 relative">
             <p className="text-xs text-yellow-600 font-bold tracking-[0.2em] uppercase mb-2">
               Accumulated Yield
             </p>
             <div className="flex items-baseline gap-2">
-              <span className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-600 drop-shadow-sm">
+              {/* UPDATED: bg-gradient -> bg-linear */}
+              <span className="text-4xl font-bold text-transparent bg-clip-text bg-linear-to-r from-yellow-200 via-yellow-400 to-yellow-600 drop-shadow-sm">
                 +{displayYield ? formatEther(displayYield) : "0.00"}
               </span>
               <span className="text-sm text-yellow-700 font-bold">
@@ -480,17 +634,18 @@ function EnterpriseDashboard() {
             <div className="absolute top-0 right-0 w-20 h-20 bg-white/5 rounded-full blur-xl"></div>
           </div>
 
-          <div className="space-y-4 relative z-10">
+          {/* DEPOSIT SECTION */}
+          <div className="space-y-4 relative z-10 mb-8 border-b border-white/5 pb-8">
             <div className="relative group/input">
               <input
                 type="number"
                 placeholder="0.00"
                 value={depositAmount}
                 onChange={(e) => setDepositAmount(e.target.value)}
-                className="w-full bg-[#050505] border border-yellow-900/40 rounded-xl px-5 py-5 text-white focus:border-yellow-500 outline-none text-xl font-mono transition-colors group-hover/input:border-yellow-700/60"
+                className="w-full bg-[#050505] border border-yellow-900/40 rounded-xl px-5 py-4 text-white focus:border-yellow-500 outline-none text-lg font-mono transition-colors group-hover/input:border-yellow-700/60"
               />
               <span className="absolute right-5 top-1/2 -translate-y-1/2 text-xs font-bold text-yellow-600 bg-yellow-900/10 px-2 py-1 rounded">
-                DEPOSIT {treasurySymbol}
+                DEP {treasurySymbol}
               </span>
             </div>
 
@@ -498,21 +653,47 @@ function EnterpriseDashboard() {
               <button
                 onClick={handleApprove}
                 disabled={isDepPending || isDepConfirming}
-                className="w-full bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-4 rounded-xl transition-all shadow-[0_0_20px_rgba(202,138,4,0.2)]"
+                className="w-full bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-3 rounded-xl transition-all shadow-[0_0_20px_rgba(202,138,4,0.2)]"
               >
                 {isDepPending ? "Approving Access..." : "1. Approve Contract"}
               </button>
             ) : (
+              // UPDATED: bg-gradient -> bg-linear
               <button
                 onClick={handleDeposit}
                 disabled={isDepPending || isDepConfirming || !depositAmount}
-                className="w-full bg-gradient-to-r from-white to-gray-300 hover:from-white hover:to-white text-black font-bold py-4 rounded-xl transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)]"
+                className="w-full bg-linear-to-r from-white to-gray-300 hover:from-white hover:to-white text-black font-bold py-3 rounded-xl transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)]"
               >
                 {isDepPending || isDepConfirming
                   ? "Processing Deposit..."
                   : "2. Deposit to Pool"}
               </button>
             )}
+          </div>
+
+          {/* WITHDRAW SECTION (ADDED) */}
+          <div className="space-y-4 relative z-10 mt-auto">
+            <div className="relative group/input">
+              <input
+                type="number"
+                placeholder="0.00"
+                value={withdrawAmount}
+                onChange={(e) => setWithdrawAmount(e.target.value)}
+                className="w-full bg-[#050505] border border-white/10 rounded-xl px-5 py-4 text-white focus:border-red-500 outline-none text-lg font-mono transition-colors"
+              />
+              <span className="absolute right-5 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-500 bg-white/5 px-2 py-1 rounded">
+                W/D {treasurySymbol}
+              </span>
+            </div>
+            <button
+              onClick={handleWithdraw}
+              disabled={isWithPending || isWithConfirming || !withdrawAmount}
+              className="w-full bg-white/5 hover:bg-red-900/20 hover:border-red-500/50 border border-white/10 text-gray-300 hover:text-red-400 font-bold py-3 rounded-xl transition-all"
+            >
+              {isWithPending || isWithConfirming
+                ? "Withdrawing..."
+                : "Withdraw Assets"}
+            </button>
           </div>
         </div>
       </div>
@@ -565,6 +746,7 @@ function EnterpriseDashboard() {
                     <div className="w-8 h-8 rounded-full bg-yellow-900/20 text-yellow-600 flex items-center justify-center font-mono text-xs border border-yellow-900/30 shrink-0">
                       {index + 1}
                     </div>
+                    {/* UPDATED: flex-grow -> grow */}
                     <input
                       type="text"
                       placeholder="Recipient Wallet (0x...)"
@@ -572,7 +754,7 @@ function EnterpriseDashboard() {
                       onChange={(e) =>
                         handleInputChange(index, "address", e.target.value)
                       }
-                      className="flex-grow w-full sm:w-auto bg-[#111] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-yellow-500 outline-none font-mono"
+                      className="grow w-full sm:w-auto bg-[#111] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-yellow-500 outline-none font-mono"
                     />
                     <div className="flex gap-2 w-full sm:w-auto">
                       <div className="relative w-[140px]">
@@ -728,6 +910,7 @@ function EnterpriseDashboard() {
               </div>
             )}
 
+            {/* UPDATED: bg-gradient -> bg-linear */}
             <button
               onClick={handleExecutePayroll}
               disabled={
@@ -735,7 +918,7 @@ function EnterpriseDashboard() {
                 isPayConfirming ||
                 (totalPayrollUSDT <= 0 && totalPayrollDAI <= 0)
               }
-              className="w-full bg-gradient-to-r from-yellow-600 via-yellow-500 to-yellow-600 hover:from-yellow-500 hover:to-yellow-400 text-black font-extrabold text-lg py-5 rounded-xl transition-all shadow-[0_0_30px_rgba(234,179,8,0.2)] disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transform active:scale-[0.99]"
+              className="w-full bg-linear-to-r from-yellow-600 via-yellow-500 to-yellow-600 hover:from-yellow-500 hover:to-yellow-400 text-black font-extrabold text-lg py-5 rounded-xl transition-all shadow-[0_0_30px_rgba(234,179,8,0.2)] disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transform active:scale-[0.99]"
             >
               {isPayPending || isPayConfirming ? (
                 "Processing Batch Transaction..."

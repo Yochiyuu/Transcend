@@ -745,3 +745,17 @@ export const ENTERPRISE_ABI = [
     type: "function",
   },
 ] as const;
+
+export const MOCK_LENDING_ABI = [
+  {
+    inputs: [
+      { internalType: "address", name: "token", type: "address" },
+      { internalType: "address", name: "enterprisePool", type: "address" },
+      { internalType: "uint256", name: "amount", type: "uint256" },
+    ],
+    name: "addMockYield",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+] as const;
