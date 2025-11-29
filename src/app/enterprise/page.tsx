@@ -7,16 +7,16 @@ import {
   DAI_ADDRESS,
   ENTERPRISE_ABI,
   ENTERPRISE_ADDRESS,
-  ERC20_ABI,
+  ERC20_ABI, // Tambahkan MOCK_LENDING_ABI untuk admin panel
   USDT_ADDRESS,
 } from "@/utils/abi";
 import { config } from "@/utils/config";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react"; // FIX: Tambahkan useRef
 import {
   FaBriefcase,
   FaCheck,
-  FaCircleExclamation, // Menggunakan FaGears (pengganti FaCogs)
+  FaCircleExclamation,
   FaFileCsv,
   FaGears,
   FaLandmark,
@@ -110,10 +110,167 @@ interface RowData {
   token: `0x${string}`;
 }
 
+// --- ADMIN / DEMO PANEL COMPONENT (FIXED FOR PHYSICAL YIELD) ---
+function AdminPanel({ onClose }: { onClose: () => void }) {
+  const { address } = useAccount(); // Akses address
+  const { writeContract, isPending } = useWriteContract();
+  const [injectAmount, setInjectAmount] = useState("500");
+
+  // Read Allowance untuk Yield Inject (Perlu Approve Baru)
+  const { data: allowanceUSDT, refetch: refetchAllowanceUSDT } =
+    useReadContract({
+      abi: ERC20_ABI,
+      address: USDT_ADDRESS,
+      functionName: "allowance",
+      args: address ? [address, ENTERPRISE_ADDRESS] : undefined,
+      query: { enabled: !!address },
+    });
+
+  const handleWhitelist = (token: `0x${string}`, symbol: string) => {
+    writeContract({
+      address: ENTERPRISE_ADDRESS,
+      abi: ENTERPRISE_ABI,
+      functionName: "setTokenWhitelist",
+      args: [token, true],
+    });
+  };
+
+  // Logic Inject Yield (Ambil token fisik dari user ke contract)
+  const handleInjectYield = (token: `0x${string}`) => {
+    if (!address) return alert("Wallet not connected");
+    if (!injectAmount || parseFloat(injectAmount) <= 0)
+      return alert("Masukkan jumlah yield.");
+
+    writeContract({
+      address: ENTERPRISE_ADDRESS,
+      abi: ENTERPRISE_ABI,
+      functionName: "recordYield",
+      args: [address, token, parseEther(injectAmount)],
+    });
+  };
+
+  // Logic Approve untuk Inject Yield
+  const handleApproveYield = (token: `0x${string}`) => {
+    writeContract({
+      address: token,
+      abi: ERC20_ABI,
+      functionName: "approve",
+      args: [ENTERPRISE_ADDRESS, maxUint256],
+    });
+  };
+
+  const handleForceRegister = () => {
+    writeContract({
+      address: ENTERPRISE_ADDRESS,
+      abi: ENTERPRISE_ABI,
+      functionName: "registerCompany",
+    });
+  };
+
+  const neededApprove =
+    allowanceUSDT !== undefined &&
+    allowanceUSDT < parseEther(injectAmount || "0");
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+      <div className="bg-[#111] border border-red-500/30 rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors cursor-pointer"
+        >
+          ✕
+        </button>
+
+        <h3 className="text-xl font-bold text-red-500 mb-1 flex items-center gap-2">
+          <FaGears /> Admin / Demo Panel
+        </h3>
+        <p className="text-xs text-gray-500 mb-6">
+          Setup demo environment (Company Level Control).
+        </p>
+
+        <div className="space-y-6">
+          {/* 0. EMERGENCY REGISTER */}
+          <div className="bg-red-900/10 border border-red-500/20 p-3 rounded-lg">
+            <button
+              onClick={handleForceRegister}
+              disabled={isPending}
+              className="w-full bg-red-600 hover:bg-red-500 text-white text-xs font-bold py-2 rounded transition-all cursor-pointer"
+            >
+              FORCE REGISTER ACCOUNT
+            </button>
+          </div>
+
+          {/* 1. WHITELIST SECTION */}
+          <div>
+            <p className="text-sm font-bold text-white mb-2">
+              1. Whitelist Tokens
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => handleWhitelist(USDT_ADDRESS, "USDT")}
+                disabled={isPending}
+                className="bg-white/5 hover:bg-white/10 border border-white/10 p-2 rounded text-xs text-gray-300 transition-colors cursor-pointer"
+              >
+                Whitelist USDT
+              </button>
+              <button
+                onClick={() => handleWhitelist(DAI_ADDRESS, "DAI")}
+                disabled={isPending}
+                className="bg-white/5 hover:bg-white/10 border border-white/10 p-2 rounded text-xs text-gray-300 transition-colors cursor-pointer"
+              >
+                Whitelist DAI
+              </button>
+            </div>
+          </div>
+
+          {/* 2. YIELD SECTION (FIXED LOGIC) */}
+          <div className="border border-green-500/20 p-4 rounded-lg space-y-3">
+            <p className="text-sm font-bold text-white mb-1">
+              2. Inject Yield (Profit Fisik)
+            </p>
+            <input
+              type="number"
+              placeholder="Jumlah Yield"
+              value={injectAmount}
+              onChange={(e) => {
+                setInjectAmount(e.target.value);
+                refetchAllowanceUSDT();
+              }} // Refetch saat input berubah
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
+            />
+
+            {neededApprove ? (
+              <button
+                onClick={() => handleApproveYield(USDT_ADDRESS)}
+                disabled={isPending}
+                className="w-full bg-yellow-600 hover:bg-yellow-500 text-black text-xs font-bold py-2 rounded transition-all cursor-pointer"
+              >
+                1. Approve Yield ({injectAmount} USDT)
+              </button>
+            ) : (
+              <button
+                onClick={() => handleInjectYield(USDT_ADDRESS)}
+                disabled={isPending}
+                className="w-full bg-green-500 hover:bg-green-400 text-black text-xs font-bold py-2 rounded transition-all cursor-pointer"
+              >
+                2. Inject Yield Fisik ({injectAmount} USDT)
+              </button>
+            )}
+            <p className="text-[10px] text-gray-500 mt-1">
+              Token fisik akan ditarik dari wallet Anda ke Treasury.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+// --- END ADMIN PANEL ---
+
 function EnterpriseManager() {
   const { address, isConnected } = useAccount();
   const [mounted, setMounted] = useState(false);
-  const [showAdmin, setShowAdmin] = useState(false); // Toggle Admin Panel
+  const [showAdmin, setShowAdmin] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -164,7 +321,7 @@ function EnterpriseManager() {
       <div className="fixed bottom-4 left-4 z-50">
         <button
           onClick={() => setShowAdmin(!showAdmin)}
-          className="p-3 bg-gray-900/80 hover:bg-red-900/80 text-gray-500 hover:text-white rounded-full transition-all border border-white/10 shadow-lg"
+          className="p-3 bg-gray-900/80 hover:bg-red-900/80 text-gray-500 hover:text-white rounded-full transition-all border border-white/10 shadow-lg cursor-pointer"
           title="Toggle Admin/Demo Panel"
         >
           {showAdmin ? <FaLock /> : <FaGears />}
@@ -174,108 +331,6 @@ function EnterpriseManager() {
       {/* ADMIN PANEL */}
       {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
     </>
-  );
-}
-
-// --- ADMIN / DEMO PANEL COMPONENT (FIXED) ---
-function AdminPanel({ onClose }: { onClose: () => void }) {
-  // FIX: Panggil address dari useAccount disini
-  const { address } = useAccount();
-  const { writeContract, isPending } = useWriteContract();
-
-  const { data: lendingPoolAddress } = useReadContract({
-    abi: ENTERPRISE_ABI,
-    address: ENTERPRISE_ADDRESS,
-    functionName: "lendingPool",
-  });
-
-  const handleWhitelist = (token: `0x${string}`, symbol: string) => {
-    writeContract({
-      address: ENTERPRISE_ADDRESS,
-      abi: ENTERPRISE_ABI,
-      functionName: "setTokenWhitelist",
-      args: [token, true],
-    });
-  };
-
-  // FIX: Gunakan recordYield agar aman jika lending pool 0x0
-  const handleInjectYield = (token: `0x${string}`) => {
-    if (!address) return alert("Wallet not connected");
-
-    writeContract({
-      address: ENTERPRISE_ADDRESS,
-      abi: ENTERPRISE_ABI,
-      functionName: "recordYield",
-      args: [address, token, parseEther("500")], // Tambah 500 Token Yield
-    });
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-      <div className="bg-[#111] border border-red-500/30 rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
-        >
-          ✕
-        </button>
-
-        <h3 className="text-xl font-bold text-red-500 mb-1 flex items-center gap-2">
-          <FaGears /> Admin / Demo Panel
-        </h3>
-        <p className="text-xs text-gray-500 mb-6">
-          Use this to setup your demo environment quickly.
-        </p>
-
-        <div className="space-y-6">
-          {/* 1. WHITELIST SECTION */}
-          <div>
-            <p className="text-sm font-bold text-white mb-2">
-              1. Whitelist Tokens
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => handleWhitelist(USDT_ADDRESS, "USDT")}
-                disabled={isPending}
-                className="bg-white/5 hover:bg-white/10 border border-white/10 p-2 rounded text-xs text-gray-300 transition-colors"
-              >
-                Whitelist USDT
-              </button>
-              <button
-                onClick={() => handleWhitelist(DAI_ADDRESS, "DAI")}
-                disabled={isPending}
-                className="bg-white/5 hover:bg-white/10 border border-white/10 p-2 rounded text-xs text-gray-300 transition-colors"
-              >
-                Whitelist DAI
-              </button>
-            </div>
-          </div>
-
-          {/* 2. YIELD SECTION */}
-          <div>
-            <p className="text-sm font-bold text-white mb-2">
-              2. Inject Mock Yield (+500)
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => handleInjectYield(USDT_ADDRESS)}
-                disabled={isPending}
-                className="bg-green-900/20 hover:bg-green-900/40 border border-green-500/20 p-2 rounded text-xs text-green-400 transition-colors"
-              >
-                Inject USDT Yield
-              </button>
-              <button
-                onClick={() => handleInjectYield(DAI_ADDRESS)}
-                disabled={isPending}
-                className="bg-orange-900/20 hover:bg-orange-900/40 border border-orange-500/20 p-2 rounded text-xs text-orange-400 transition-colors"
-              >
-                Inject DAI Yield
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -330,7 +385,7 @@ function RegisterView({ onSuccess }: { onSuccess: () => void }) {
             })
           }
           disabled={isPending || isConfirming}
-          className="w-full bg-linear-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 text-black font-bold text-lg py-5 rounded-xl transition-all shadow-lg shadow-yellow-600/20 hover:shadow-yellow-500/40 disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wide"
+          className="w-full bg-linear-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 text-black font-bold text-lg py-5 rounded-xl transition-all shadow-lg shadow-yellow-600/20 hover:shadow-yellow-500/40 disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wide cursor-pointer"
         >
           {isPending || isConfirming
             ? "Processing Registration..."
@@ -344,14 +399,12 @@ function RegisterView({ onSuccess }: { onSuccess: () => void }) {
 function EnterpriseDashboard() {
   const { address } = useAccount();
   const [depositAmount, setDepositAmount] = useState("");
-  const [withdrawAmount, setWithdrawAmount] = useState(""); // State baru untuk withdraw
+  const [withdrawAmount, setWithdrawAmount] = useState("");
 
-  // STATE UNTUK TREASURY VIEW (Kiri)
   const [treasuryViewToken, setTreasuryViewToken] =
     useState<`0x${string}`>(USDT_ADDRESS);
   const treasurySymbol = treasuryViewToken === USDT_ADDRESS ? "USDT" : "DAI";
 
-  // WRITE DEPOSIT
   const {
     writeContract: writeDeposit,
     isPending: isDepPending,
@@ -361,7 +414,6 @@ function EnterpriseDashboard() {
     hash: depHash,
   });
 
-  // WRITE WITHDRAW
   const {
     writeContract: writeWithdraw,
     isPending: isWithPending,
@@ -387,7 +439,6 @@ function EnterpriseDashboard() {
   const { isLoading: isPayConfirming, isSuccess: isPaySuccess } =
     useWaitForTransactionReceipt({ hash: payHash });
 
-  // READ DATA (Allowance & Yield)
   const { data: allowance, refetch: refetchAllowance } = useReadContract({
     abi: ERC20_ABI,
     address: treasuryViewToken,
@@ -447,10 +498,8 @@ function EnterpriseDashboard() {
       });
   };
 
-  // --- GAS OPTIMIZED MULTI-TOKEN PAYROLL ---
   const handleExecutePayroll = () => {
     try {
-      // 1. Grouping Data berdasarkan Token
       const tokenGroups: Record<
         string,
         { recipients: `0x${string}`[]; amounts: bigint[] }
@@ -482,7 +531,6 @@ function EnterpriseDashboard() {
         tokenGroups[token].amounts.push(amountWei);
       }
 
-      // 2. Cek Saldo Yield
       const usdtAvailable = yieldUSDT || 0n;
       const daiAvailable = yieldDAI || 0n;
 
@@ -495,12 +543,10 @@ function EnterpriseDashboard() {
         return;
       }
 
-      // 3. Prepare Arrays untuk executePayrollMulti
       const tokensList = Object.keys(tokenGroups) as `0x${string}`[];
       const recipientsList = tokensList.map((t) => tokenGroups[t].recipients);
       const amountsList = tokensList.map((t) => tokenGroups[t].amounts);
 
-      // 4. Kirim Transaksi
       writePayroll({
         address: ENTERPRISE_ADDRESS,
         abi: ENTERPRISE_ABI,
@@ -524,11 +570,11 @@ function EnterpriseDashboard() {
       const lines = text.split(/\r?\n/);
       const newRows: RowData[] = [];
       lines.forEach((l) => {
-        const p = l.split(",").map((x) => x.trim());
+        const p = l.split(/[;,]/).map((x) => x.trim());
         if (p.length >= 2 && isAddress(p[0]) && !isNaN(parseFloat(p[1]))) {
-          const sym = p[2]?.toUpperCase();
-          let token: `0x${string}` = USDT_ADDRESS;
-          if (sym === "DAI") token = DAI_ADDRESS;
+          const sym = p[2]?.toUpperCase() || "";
+          let token: `0x${string}` = USDT_ADDRESS as `0x${string}`;
+          if (sym.includes("DAI")) token = DAI_ADDRESS as `0x${string}`;
           newRows.push({ address: p[0], amount: p[1], token });
         }
       });
@@ -559,12 +605,12 @@ function EnterpriseDashboard() {
     .reduce((acc, row) => acc + (parseFloat(row.amount) || 0), 0);
 
   useEffect(() => {
-    if (!isDepConfirming || !isWithConfirming) {
+    if (!isDepConfirming || !isWithConfirming || !isPayConfirming) {
       refetchAllowance();
       refetchYieldUSDT();
       refetchYieldDAI();
     }
-  }, [isDepConfirming, isWithConfirming, treasuryViewToken]);
+  }, [isDepConfirming, isWithConfirming, isPayConfirming, treasuryViewToken]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 w-full">
@@ -848,7 +894,6 @@ function EnterpriseDashboard() {
                 <p className="text-gray-500 text-xs uppercase tracking-widest mb-1">
                   Pool Status
                 </p>
-                {/* Visualizer Status Sederhana */}
                 <div className="flex flex-col items-end gap-1">
                   {totalPayrollUSDT > 0 && (
                     <p
