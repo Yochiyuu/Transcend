@@ -240,21 +240,34 @@ function DashboardForm() {
       const lines = text.split(/\r?\n/);
       const newRows: RowData[] = [];
       lines.forEach((line) => {
-        const parts = line.split(",").map((p) => p.trim());
-        if (parts.length >= 2) {
+        // FIX: Gunakan Regex /[;,]/ untuk memisahkan berdasarkan koma ATAU titik koma
+        const parts = line.split(/[;,]/).map((p) => p.trim());
+
+        // Pastikan baris tidak kosong dan punya minimal 2 kolom
+        if (parts.length >= 2 && parts[0] !== "") {
           const addr = parts[0];
           const amt = parts[1];
+          // Ambil token dari kolom ke-3, default ke LSK jika kosong
           const symRaw = parts[2]?.toUpperCase() || "LSK";
+
           let tType: "NATIVE" | "USDT" | "DAI" = "NATIVE";
-          if (symRaw === "USDT") tType = "USDT";
-          if (symRaw === "DAI") tType = "DAI";
+          if (symRaw.includes("USDT")) tType = "USDT";
+          else if (symRaw.includes("DAI")) tType = "DAI";
+
           if (isAddress(addr) && !isNaN(parseFloat(amt))) {
             newRows.push({ address: addr, amount: amt, tokenType: tType });
           }
         }
       });
-      if (newRows.length > 0) setRows(newRows);
-      else alert("Invalid CSV format.");
+
+      if (newRows.length > 0) {
+        setRows(newRows);
+      } else {
+        alert(
+          "Format CSV tidak valid atau kosong. Pastikan menggunakan pemisah koma (,) atau titik koma (;)"
+        );
+      }
+
       if (fileInputRef.current) fileInputRef.current.value = "";
     };
     reader.readAsText(file);
