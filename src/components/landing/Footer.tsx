@@ -33,7 +33,7 @@ export default function Footer() {
               </span>
             </Link>
             <p className="text-gray-400 text-sm leading-relaxed max-w-sm">
-              The next-generation payment gateway for Web3. Secure, transparent,
+              The next-generation transaction gateway for Web3. Secure, transparent,
               and built for the future of decentralized finance.
             </p>
             <div className="flex gap-4">
